@@ -13,11 +13,12 @@ import { ConditionsSheet } from './sheets/conditions-sheet';
 
 type SheetName = 'location' | 'radius' | 'budget' | 'conditions' | null;
 
-function Chip({ active, onClick, children, label }: { active?: boolean; onClick: () => void; children: React.ReactNode; label?: string }) {
+function Chip({ active, onClick, children, label, id }: { active?: boolean; onClick: () => void; children: React.ReactNode; label?: string; id?: string }) {
   return (
     <button
       onClick={onClick}
-      aria-label={label}
+      title={label}
+      data-chip={id}
       aria-pressed={active}
       className={cn(
         'tap inline-flex h-9 shrink-0 items-center gap-1 rounded-full border px-3 text-xs font-medium transition active:scale-[0.98]',
@@ -40,30 +41,30 @@ export function ContextBar() {
   return (
     <>
       <div className="no-scrollbar flex items-center gap-1.5 overflow-x-auto px-4 py-2">
-        <Chip onClick={() => setOpen('location')} label="تغییر محل">
+        <Chip id="location" onClick={() => setOpen('location')} label="تغییر محل">
           <MapPin className="size-3.5 text-primary" />
           <span className="max-w-28 truncate">{state.location.label}</span>
           <ChevronDown className="size-3 opacity-60" />
         </Chip>
-        <Chip onClick={() => setOpen('radius')} label="تغییر شعاع">
+        <Chip id="radius" onClick={() => setOpen('radius')} label="تغییر شعاع">
           <CircleDot className="size-3.5 text-primary" />
           {formatDistance(state.radius_m)}
           <ChevronDown className="size-3 opacity-60" />
         </Chip>
-        <Chip onClick={() => setOpen('budget')} active={Boolean(f.max_price)} label="سقف قیمت">
+        <Chip id="budget" onClick={() => setOpen('budget')} active={Boolean(f.max_price)} label="سقف قیمت">
           <Wallet className="size-3.5" />
           {f.max_price ? `تا ${formatTomanShort(f.max_price)}` : state.budget?.max ? `بودجه ${formatTomanShort(state.budget.max)}` : 'سقف قیمت'}
           <ChevronDown className="size-3 opacity-60" />
         </Chip>
-        <Chip active={Boolean(f.open_now)} onClick={() => patch({ filters: { open_now: !f.open_now } })}>
+        <Chip id="open_now" active={Boolean(f.open_now)} onClick={() => patch({ filters: { open_now: !f.open_now } })}>
           <Clock className="size-3.5" />
           باز الان{f.open_now ? ' ✓' : ''}
         </Chip>
-        <Chip active={Boolean(f.installment)} onClick={() => patch({ filters: { installment: !f.installment } })}>
+        <Chip id="installment" active={Boolean(f.installment)} onClick={() => patch({ filters: { installment: !f.installment } })}>
           <CreditCard className="size-3.5" />
           قسطی{f.installment ? ' ✓' : ''}
         </Chip>
-        <Chip active={extraCount > 0} onClick={() => setOpen('conditions')} label="شرایط بیشتر">
+        <Chip id="conditions" active={extraCount > 0} onClick={() => setOpen('conditions')} label="شرایط بیشتر">
           <SlidersHorizontal className="size-3.5" />
           شرایط{extraCount ? ` (${toFaDigits(extraCount)})` : ''}
         </Chip>

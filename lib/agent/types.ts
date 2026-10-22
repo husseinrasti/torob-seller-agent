@@ -5,6 +5,7 @@ import type { Budget } from '../search/query';
 import type { Suggestion } from './suggest';
 import type { FollowupItem } from '../sim/followups';
 import type { AlternativesResult } from '../search/alternatives';
+import type { PlanPayload } from '../plan/trip';
 
 export type ClarifyOutput = { ui: 'clarify'; question: string; chips: string[] };
 
@@ -41,6 +42,8 @@ export type AlternativesOutput = { ui: 'alternatives'; suggested_actions: Sugges
 
 export type ChecklistOutput = { ui: 'checklist'; product_title: string; category: string | null; items: string[]; source: 'llm' | 'template' };
 
+export type PlanOutput = { ui: 'plan'; plan_id: string; share_path: string; suggested_actions: Suggestion[] } & PlanPayload;
+
 export type ErrorOutput = { ui: 'error'; message: string };
 
 export type ToolOutput =
@@ -53,6 +56,7 @@ export type ToolOutput =
   | FollowupsOutput
   | AlternativesOutput
   | ChecklistOutput
+  | PlanOutput
   | ErrorOutput;
 
 /** Message metadata used by UI actions: run `tool` with `input` right away, then let the agent comment. */

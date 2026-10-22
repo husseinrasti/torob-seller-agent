@@ -86,3 +86,17 @@ Done:
 Acceptance (`pnpm scenario --upto=5`): **15/15 checks** — 3 follow-ups resolve in ~4 s with confirmed / price_changed / out_of_stock, transcripts visible, disclaimer visible, out_of_stock → «خودکار» alternatives with the same product in the same mall first; checklist for a phone returns رجیستری/پلمب/سریال گارانتی/تست دوربین و باتری/فاکتور.
 
 Next: M5 trip plan + polish.
+
+## M5 — Trip plan + polish ✅
+
+Done:
+- `lib/plan/trip.ts` (group by mall, nearest-neighbour from the start, floors ascending, 80 m/min, +5 min/shop, +3 min/mall entry, open-at-ETA warnings, Neshan/Google/OSM links) + unit tests; `lib/plan/service.ts`; `plan_trip` tool; `POST /api/plan`; read-only shareable `/plan/[id]`.
+- TripPlan card (share via Web Share / clipboard, «چک‌لیست خرید»), suggestions for plan/checklist, dark mode toggle, Persian digits everywhere (`faText` for titles/warranty strings), 44px targets, empty states with a tappable fix.
+
+Acceptance:
+- `pnpm scenario` (spec §13 steps 1–7, 390px, demo time Sunday 16:00): **20/20 checks** in ~26 s of scripted interaction (dev and production builds), zero console errors, no horizontal scroll, no ASCII digits in UI text.
+- Lighthouse mobile on `/` (production build, no map): **Performance 92 · Accessibility 100 · Best Practices 100** (FCP 0.8 s, TBT 10 ms, CLS 0.004).
+- `/api/sellers` in production: 7–10 ms. LLM-visible `find_sellers` payload: 3.7k chars (full UI payload 25.5k).
+- `pnpm typecheck && pnpm lint && pnpm test && pnpm golden` green (99 unit tests; golden 15/15 + 10/10).
+
+Next: M6 deployment.

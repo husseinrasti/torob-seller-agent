@@ -18,8 +18,11 @@ export function suggestFromState(s: SessionState): Suggestion[] {
   const out: Suggestion[] = [];
   if (s.chosenProduct) {
     const confirmed = Object.values(s.followups).filter((v) => v === 'confirmed').length;
-    if (confirmed >= 1 || s.shortlist.length >= 2) {
+    if (confirmed >= 1 || s.shortlist.length >= 1) {
       out.push({ kind: 'action', label: 'برنامه مراجعه', text: 'برنامه مراجعه بساز', tool: 'plan_trip', input: {} });
+    }
+    if (!s.checklistOffered && (confirmed >= 1 || s.planId)) {
+      out.push({ kind: 'action', label: 'چک‌لیست خرید', text: 'چک‌لیست خرید حضوری را بده', tool: 'purchase_checklist', input: {} });
     }
     if (!s.filters.open_now) out.push({ kind: 'patch', label: 'فقط باز الان', patch: { filters: { open_now: true } } });
     if (s.intent !== 'cheapest') out.push({ kind: 'patch', label: 'ارزان‌ترین‌ها اول', patch: { intent: 'cheapest' } });

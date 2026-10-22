@@ -2,7 +2,7 @@
 
 import { CheckCircle2, CircleDashed, Clock, Loader2, PhoneOff, ShieldAlert, TriangleAlert, XCircle, Building2 } from 'lucide-react';
 import { cn } from '@/lib/utils';
-import { formatToman, relativeDays, relativeMinutes } from '@/lib/fa/format';
+import { faText, formatToman, relativeDays, relativeMinutes } from '@/lib/fa/format';
 import type { Freshness, PriceFlag } from '@/lib/data/quality';
 import type { FollowupStatus } from '@/lib/agent/state';
 import type { MallRef } from '@/lib/search/sellers';
@@ -140,7 +140,7 @@ export function ConditionChips({ c }: { c: Conditions }) {
   if (c.installment) chips.push({ text: c.installment_in_person ? 'قسطی (حضوری)' : 'قسطی (اعلام‌شده)', tone: 'ok' });
   if (c.torobpay) chips.push({ text: c.torobpay_in_person ? 'ترب‌پی (حضوری)' : 'ترب‌پی (اعلام‌شده)', tone: 'ok' });
   if (c.fast_delivery) chips.push({ text: 'ارسال فوری', tone: 'ok' });
-  if (c.warranty_text) chips.push({ text: c.warranty_text, tone: c.has_warranty === false ? 'muted' : 'ok' });
+  if (c.warranty_text) chips.push({ text: faText(c.warranty_text), tone: c.has_warranty === false ? 'muted' : 'ok' });
   if (!chips.length) return <span className={cn(pill, 'bg-muted text-muted-foreground')}>شرایط خرید اعلام نشده</span>;
   return (
     <>

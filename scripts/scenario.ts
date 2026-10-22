@@ -6,6 +6,7 @@ import fs from 'node:fs';
 const base = process.argv.find((a) => a.startsWith('http')) || process.env.APP_URL || 'http://localhost:3010';
 const out = process.argv.find((a) => a.startsWith('--out='))?.slice(6) || 'docs/screenshots/tmp';
 const upto = Number(process.argv.find((a) => a.startsWith('--upto='))?.slice(7) || 7);
+const dark = process.argv.includes('--dark');
 const DEMO_TIME = '2026-10-25T16:00';
 
 type Check = { step: string; ok: boolean; detail?: string };
@@ -40,6 +41,7 @@ async function main() {
   const started = Date.now();
   const browser = await chromium.launch({ channel: process.env.PW_CHANNEL || 'chrome', headless: true });
   const ctx = await browser.newContext({ viewport: { width: 390, height: 844 }, deviceScaleFactor: 2, locale: 'fa-IR', hasTouch: true, isMobile: true });
+  if (dark) await ctx.addInitScript(() => localStorage.setItem('theme', 'dark'));
   const page = await ctx.newPage();
   const consoleErrors: string[] = [];
   page.on('console', (m) => m.type() === 'error' && consoleErrors.push(m.text()));
@@ -89,8 +91,8 @@ async function main() {
 
   // 3b) ContextBar changes re-filter without the LLM
   const before = chatCalls.length;
-  await page.locator('button[aria-pressed]', { hasText: 'باز الان' }).first().click();
-  await page.getByRole('button', { name: 'تغییر شعاع' }).click();
+  await page.locator('[data-chip="open_now"]').click();
+  await page.locator('[data-chip="radius"]').click();
   await page.getByRole('button', { name: '۵۰۰ متر' }).click();
   await page.waitForFunction(() => /در شعاع ۵۰۰ متر/.test(document.body.innerText), null, { timeout: 30_000 });
   await page.waitForTimeout(800);
@@ -98,7 +100,7 @@ async function main() {
   check('3. open-now + 500 m shrink the list without /api/chat', chatCalls.length === before, `${h2}; chat calls during change: ${chatCalls.length - before}`);
   await snap(page, 'sellers-open-500m', 'section[aria-busy]');
 
-  await page.locator('button[aria-pressed]', { hasText: 'قسطی' }).first().click();
+  await page.locator('[data-chip="installment"]').click();
   await page.getByRole('button', { name: /حذف فیلتر قسطی/ }).waitFor({ timeout: 30_000 });
   const h3 = await page.locator('section[aria-busy] h3').last().innerText();
   check('3. installment → ≤2 + relaxation banner', /^[۰-۲] /.test(h3.trim()) || /[۰۱۲] فروشنده/.test(h3), h3);
@@ -141,10 +143,43 @@ async function main() {
   await snap(page, 'alternatives', 'section:has-text("جایگزین‌ها")');
   await page.getByRole('tab', { name: /کالای مشابه/ }).last().click();
   await snap(page, 'alternatives-similar', 'section:has-text("جایگزین‌ها")');
+  if (upto < 6) return finish();
+
+  // 6) accept the changed price, build the visit plan, open the checklist
+  const accept = page.getByRole('button', { name: 'قبول قیمت جدید' });
+  if (await accept.count()) await accept.first().click();
+  await page.waitForTimeout(500);
+  await page.getByRole('button', { name: 'برنامه مراجعه', exact: true }).first().click();
+  await page.locator('section[data-plan-id]').last().waitFor({ timeout: 30_000 });
+  await waitIdle(page);
+  const planText = await page.locator('section[data-plan-id]').last().innerText();
+  check('6. trip plan with malls, ETA and open-at-arrival', /برنامه مراجعه/.test(planText) && /پاساژ/.test(planText) && /(باز|بسته) در زمان رسیدن/.test(planText), planText.split('\n').slice(0, 3).join(' / '));
+  check('6. navigation links (Neshan / Google / OSM)', (await page.locator('section[data-plan-id] a[href*="neshan.org"]').count()) > 0);
+  await snap(page, 'trip-plan', 'section[data-plan-id]');
+  await page.locator('section[data-plan-id]').last().getByRole('button', { name: 'چک‌لیست خرید' }).click();
+  await page.getByText('چک‌لیست خرید حضوری').last().waitFor({ timeout: 30_000 });
+  await waitIdle(page);
+  const listText = await page.locator('section', { hasText: 'چک‌لیست خرید حضوری' }).last().innerText();
+  check('6. purchase checklist for a phone', /رجیستری/.test(listText) && /پلمب/.test(listText) && /فاکتور/.test(listText));
+  await snap(page, 'checklist', 'section:has-text("چک‌لیست خرید حضوری")');
+  if (upto < 7) return finish();
+
+  // 7) shared plan link opens the read-only page
+  const planId = await page.locator('section[data-plan-id]').last().getAttribute('data-plan-id');
+  const shared = await ctx.newPage();
+  const res = await shared.goto(`${base}/plan/${planId}`, { waitUntil: 'networkidle' });
+  const sharedText = await shared.locator('main').innerText();
+  check('7. /plan/[id] opens read-only', res?.status() === 200 && /برنامه مراجعه/.test(sharedText) && /فقط خواندنی/.test(sharedText));
+  await shared.screenshot({ path: `${out}/${String(++shot).padStart(2, '0')}-shared-plan.png` });
+  console.log(`      📸 ${out}/${String(shot).padStart(2, '0')}-shared-plan.png`);
+  await shared.close();
 
   return finish();
 
   async function finish() {
+    // Persian digits audit: ASCII digits not glued to Latin letters (model codes like A17/4G are fine)
+    const asciiNumbers = await page.evaluate(() => Array.from(document.body.innerText.matchAll(/(?<![A-Za-z0-9_.\-/])[0-9]+(?![A-Za-z0-9_\-/])/g)).slice(0, 12).map((m) => document.body.innerText.slice(Math.max(0, (m.index ?? 0) - 25), (m.index ?? 0) + 8).replace(/\n/g, ' ')));
+    check('Persian digits in UI text', asciiNumbers.length === 0, asciiNumbers.join(' | '));
     const overflow = await page.evaluate(() => document.documentElement.scrollWidth > window.innerWidth);
     check('no horizontal scroll', !overflow);
     check('no console errors', consoleErrors.length === 0, consoleErrors.slice(0, 3).join(' | '));

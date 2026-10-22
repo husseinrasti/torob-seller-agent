@@ -7,6 +7,7 @@ import { findSellers } from '../lib/search/sellers';
 import { parseDemoTime } from '../lib/data/hours';
 import { DEFAULT_LOCATION } from '../lib/geo';
 import { pool } from '../lib/db/client';
+import { TOOL_DEFS } from '../lib/agent/tools';
 
 type Expect = {
   text: string;
@@ -93,6 +94,12 @@ async function main() {
     ['installment=true → relaxation hint', inst.relaxations.length > 0, JSON.stringify(inst.relaxations.map((r) => `${r.label}+${r.would_add}`))],
     ['maybe_shops are separate, without price', s.maybe_shops.every((m) => !('price' in m)), String(s.maybe_shops.length)],
     ['findSellers warm < 300 ms', ms < 300, `${ms.toFixed(1)} ms`],
+    (() => {
+      // what the LLM sees per find_sellers call (UI gets the full payload)
+      const compact = JSON.stringify(TOOL_DEFS.find_sellers.toModel({ ui: 'sellers', suggested_actions: [], ...s }));
+      const full = JSON.stringify(s);
+      return ['LLM tool payload compact (< 8k tokens)', compact.length / 3 < 8000, `${compact.length} chars vs ${full.length} full`] as [string, boolean, string];
+    })(),
   ];
   let sellerOk = 0;
   console.log('Seller checks');

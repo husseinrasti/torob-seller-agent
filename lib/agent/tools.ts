@@ -13,6 +13,7 @@ import type { Suggestion } from './suggest';
 import { startFollowups } from '../sim/followups';
 import { findAlternatives } from '../search/alternatives';
 import { purchaseChecklist } from './checklist';
+import { buildPlan } from '../plan/service';
 import type {
   AlternativesOutput,
   ChecklistOutput,
@@ -20,6 +21,7 @@ import type {
   CompareOutput,
   ContextOutput,
   FollowupsOutput,
+  PlanOutput,
   ProductsOutput,
   SellersOutput,
   ShopOutput,
@@ -306,6 +308,27 @@ export const TOOL_DEFS = {
       origin: { shop: o.origin.shop_name, mall: o.origin.mall_name },
       same_product: o.same_product.map((r) => ({ offer_id: r.offer_id, shop: r.shop_name, price: r.price, distance_m: r.distance_m, same_mall: r.same_mall, mall: mallText(r.mall), open: r.open.label })),
       similar: o.similar.map((x) => ({ offer_id: x.offer_id, title: x.title, price: x.price, shop: x.shop_name, why: x.why })),
+    }),
+  }),
+
+  plan_trip: def({
+    description:
+      'Visit plan: orders the chosen shops (default: shortlist + confirmed/pending follow-ups) by mall and distance, floors ascending inside a mall, with ETA, open-at-arrival checks and navigation links. Returns a shareable link.',
+    input: z.object({ offer_ids: z.array(z.string()).max(8).optional() }),
+    run: async (i, ctx): Promise<PlanOutput> => {
+      const res = await buildPlan({ sessionId: ctx.sessionId, state: ctx.state, now: ctx.now, offerIds: i.offer_ids });
+      if (!res) throw new Error('هنوز فروشنده‌ای برای برنامه انتخاب نشده؛ اول پیگیری کنید یا «به برنامه» را بزنید.');
+      ctx.state.planId = res.plan_id;
+      const suggested: Suggestion[] = ctx.state.checklistOffered
+        ? []
+        : [{ kind: 'action', label: 'چک‌لیست خرید', text: 'چک‌لیست خرید حضوری را بده', tool: 'purchase_checklist', input: {} }];
+      return { ui: 'plan', plan_id: res.plan_id, share_path: `/plan/${res.plan_id}`, ...res.payload, suggested_actions: suggested };
+    },
+    toModel: (o) => ({
+      plan_id: o.plan_id,
+      total_minutes: o.total_minutes,
+      warnings: o.warnings,
+      steps: o.groups.flatMap((g) => g.steps.map((s) => ({ order: s.order, shop: s.shop_name, mall: s.mall, floor: s.floor_label, unit: s.unit_label, eta: s.eta_label, open_at_eta: s.open_at_eta.label, warning: s.warning }))),
     }),
   }),
 

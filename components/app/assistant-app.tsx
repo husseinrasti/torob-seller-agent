@@ -97,7 +97,13 @@ function Shell() {
     window.scrollTo({ top: 0 });
   }, [stop, setMessages, clearError, session]);
 
-  const suggestions = messages.length ? (lastToolSuggestions(messages) ?? session.suggestions.filter((s) => s.kind !== 'message' || s.text.startsWith('چرا'))) : [];
+  const suggestions = useMemo(() => {
+    if (!messages.length) return [];
+    const fromTool = lastToolSuggestions(messages) ?? [];
+    const seen = new Set(fromTool.map((s) => s.label));
+    const fromState = session.suggestions.filter((s) => s.kind !== 'message' && !seen.has(s.label));
+    return [...fromTool, ...fromState].slice(0, 6);
+  }, [messages, session.suggestions]);
 
   return (
     <ChatActionsContext.Provider value={actions}>

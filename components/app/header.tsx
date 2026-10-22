@@ -1,6 +1,7 @@
 'use client';
 
-import { Map as MapIcon, RotateCcw, ShoppingBag } from 'lucide-react';
+import { Map as MapIcon, Moon, RotateCcw, ShoppingBag, Sun } from 'lucide-react';
+import { useTheme } from 'next-themes';
 import { Button } from '@/components/ui/button';
 import { cn } from '@/lib/utils';
 import { localClock, FA_DAY, parseDemoTime } from '@/lib/data/hours';
@@ -18,6 +19,7 @@ function demoLabel(demoTime: string | undefined): string | null {
 
 export function Header({ mapOpen, onToggleMap, onNewChat, hasMessages }: { mapOpen: boolean; onToggleMap: () => void; onNewChat: () => void; hasMessages: boolean }) {
   const { state, llm } = useSession();
+  const { resolvedTheme, setTheme } = useTheme();
   const demo = demoLabel(state?.demoTime);
   return (
     <div className="flex h-14 items-center justify-between gap-2 px-4">
@@ -38,6 +40,16 @@ export function Header({ mapOpen, onToggleMap, onNewChat, hasMessages }: { mapOp
         </div>
       </div>
       <div className="flex items-center gap-1">
+        <Button
+          variant="ghost"
+          size="icon"
+          className="size-11"
+          onClick={() => setTheme(resolvedTheme === 'dark' ? 'light' : 'dark')}
+          aria-label="تغییر حالت روشن و تیره"
+        >
+          <Sun className="hidden size-4 dark:block" />
+          <Moon className="size-4 dark:hidden" />
+        </Button>
         {hasMessages && (
           <Button variant="ghost" size="icon" className="size-11" onClick={onNewChat} aria-label="گفتگوی تازه">
             <RotateCcw className="size-4" />
