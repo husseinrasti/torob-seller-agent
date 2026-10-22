@@ -58,3 +58,14 @@ export function relativeMinutes(fromIso: string, now: Date = new Date()): string
 export function formatTime(hhmm: string): string {
   return toFaDigits(hhmm.slice(0, 5));
 }
+
+/**
+ * Persian digits inside free text (product titles) while keeping model codes Latin:
+ * «حافظه 128 رم 4 | A17 4G» → «حافظه ۱۲۸ رم ۴ · A17 4G».
+ */
+export function faText(s: string | null | undefined): string {
+  if (!s) return '';
+  return s
+    .replace(/\s*\|\s*/g, ' · ')
+    .replace(/(?<![A-Za-z0-9_.\-/])\d+(?:\.\d+)?(?![A-Za-z0-9_\-/])/g, (m) => toFaDigits(m));
+}

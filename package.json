@@ -18,11 +18,15 @@
     "golden": "tsx scripts/golden.ts",
     "llm-check": "tsx scripts/llm-check.ts",
     "smoke": "tsx scripts/smoke.ts",
-    "build:scripts": "esbuild lib/db/migrate.ts scripts/seed.ts --bundle --platform=node --target=node22 --format=cjs --outdir=dist-scripts --entry-names=[name] --out-extension:.js=.cjs --external:pg-native"
+    "build:scripts": "esbuild lib/db/migrate.ts scripts/seed.ts --bundle --platform=node --target=node22 --format=cjs --outdir=dist-scripts --entry-names=[name] --out-extension:.js=.cjs --external:pg-native",
+    "scenario": "tsx scripts/scenario.ts",
+    "predev": "node scripts/copy-maplibre-worker.mjs",
+    "prebuild": "node scripts/copy-maplibre-worker.mjs"
   },
   "dependencies": {
     "@ai-sdk/google": "^4.0.102",
     "@ai-sdk/openai": "^4.0.99",
+    "@ai-sdk/provider": "4.0.31",
     "@ai-sdk/react": "^4.0.152",
     "@openrouter/ai-sdk-provider": "^3.1.0",
     "ai": "^7.0.148",

@@ -26,6 +26,7 @@ const eslintConfig = [
       'components/ui/**',
       'next-env.d.ts',
       'video/**',
+      'public/**',
       'data/**',
     ],
   },

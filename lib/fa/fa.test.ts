@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import { toEnDigits, toFaDigits } from './digits';
 import { normalizeFa, normalizeForSearch, zwnjVariants } from './normalize';
-import { formatDistance, formatNumber, formatToman, formatTomanShort, relativeDays } from './format';
+import { faText, formatDistance, formatNumber, formatToman, formatTomanShort, relativeDays } from './format';
 
 describe('digits', () => {
   it('converts Persian and Arabic digits to ASCII', () => {
@@ -70,5 +70,13 @@ describe('format', () => {
     expect(relativeDays(21)).toBe('۳ هفته پیش');
     expect(relativeDays(65)).toBe('۲ ماه پیش');
     expect(relativeDays(null)).toBe('نامشخص');
+  });
+});
+
+describe('faText', () => {
+  it('converts standalone numbers but keeps model codes', () => {
+    expect(faText('گوشی سامسونگ A17 4G | حافظه 128 رم 4 گیگابایت')).toBe('گوشی سامسونگ A17 4G · حافظه ۱۲۸ رم ۴ گیگابایت');
+    expect(faText('سیم 2 در 2.5')).toBe('سیم ۲ در ۲٫۵');
+    expect(faText('مدل DS-2CD1023G2-LIU')).toBe('مدل DS-2CD1023G2-LIU');
   });
 });

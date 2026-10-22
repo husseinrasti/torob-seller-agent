@@ -1,8 +1,7 @@
-export default function Home() {
-  return (
-    <main className="mx-auto flex min-h-dvh max-w-[520px] flex-col gap-4 bg-background p-4">
-      <h1 className="text-2xl font-bold">همراه خرید</h1>
-      <p className="text-muted-foreground">دستیار هوشمند خرید حضوری در تهران — در حال ساخت.</p>
-    </main>
-  );
+import { AssistantApp } from '@/components/app/assistant-app';
+
+export default async function Home({ searchParams }: { searchParams: Promise<Record<string, string | string[] | undefined>> }) {
+  const sp = await searchParams;
+  const demoTime = typeof sp.demo_time === 'string' ? sp.demo_time : null;
+  return <AssistantApp demoTime={demoTime} />;
 }

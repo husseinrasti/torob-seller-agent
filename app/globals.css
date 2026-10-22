@@ -129,3 +129,13 @@
 .no-scrollbar {
   scrollbar-width: none;
 }
+
+/* Small chips keep their look but get a ≥ 44px touch target. */
+.tap {
+  position: relative;
+}
+.tap::after {
+  content: '';
+  position: absolute;
+  inset: -6px -2px;
+}

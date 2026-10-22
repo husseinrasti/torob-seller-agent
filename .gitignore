@@ -37,3 +37,6 @@ pnpm-debug.log*
 .DS_Store
 .idea/
 .vscode/
+
+# generated at predev/prebuild
+public/maplibre/
