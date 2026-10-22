@@ -1,5 +1,5 @@
 import { q } from '../db/client';
-import { bbox, haversine, RADIUS_STEPS, SQL_DISTANCE } from '../geo';
+import { bbox, haversine, navLinks, RADIUS_STEPS, SQL_DISTANCE } from '../geo';
 import { openState, todayHoursText, hoursKnown, type WeeklyHours } from '../data/hours';
 import { floorText } from '../data/mall';
 import { toFaDigits } from '../fa/digits';
@@ -357,13 +357,6 @@ export type ShopDetails = {
   nav_links: { osm: string; google: string; neshan: string };
 };
 
-export function navLinks(lat: number, lon: number) {
-  return {
-    osm: `https://www.openstreetmap.org/?mlat=${lat}&mlon=${lon}#map=19/${lat}/${lon}`,
-    google: `https://maps.google.com/?q=${lat},${lon}`,
-    neshan: `https://neshan.org/maps/@${lat},${lon},18z`,
-  };
-}
 
 /** Spec §6.2 shop_details: location inside the mall, today's hours, conditions, ≤5 other offers of the category. */
 export async function shopDetails(shopId: string, opts: { category?: string | null; excludeProductId?: string; now?: Date } = {}): Promise<ShopDetails | null> {

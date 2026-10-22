@@ -22,3 +22,12 @@ export const SQL_DISTANCE = (latParam: string, lonParam: string, alias = 's') =>
 
 export const DEFAULT_LOCATION = { lat: 35.6957, lon: 51.4105, label: 'فردوسی (پیش‌فرض)', source: 'default' as const };
 export const RADIUS_STEPS = [500, 1000, 2000, 3000, 5000];
+
+/** Plain geo links for turn-by-turn navigation apps (spec §8). */
+export function navLinks(lat: number, lon: number) {
+  return {
+    osm: `https://www.openstreetmap.org/?mlat=${lat}&mlon=${lon}#map=19/${lat}/${lon}`,
+    google: `https://maps.google.com/?q=${lat},${lon}`,
+    neshan: `https://neshan.org/maps/@${lat},${lon},18z`,
+  };
+}
