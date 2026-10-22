@@ -41,3 +41,18 @@ Acceptance results:
 - Price flags: ok 309,444 · missing 15,083 · suspicious_low 5,844 · suspicious_high 1,135.
 
 Next: M2 search & ranking API.
+
+## M2 — Search & ranking API ✅
+
+Done:
+- `lib/search/query.ts` (Persian budget parser, filler removal, synonyms), `rank.ts` (rerank), `specs.ts` (card specs, diff table), `products.ts` (`searchProducts`, `compareProducts`, templated «چرا»), `categories.ts` (`routeCategories` + LRU cache), `sellers.ts` (`findSellers`, `shopDetails`, clusters, maybe_shops, relaxations), `score.ts` (explainable intent-weighted score + why phrases).
+- `GET /api/sellers` (no LLM) and `GET /api/products/search?q=`.
+- `scripts/golden.ts`.
+
+Acceptance results:
+- `pnpm golden` → **products 15/15**, **sellers 9/9** (rules mode — no LLM key available).
+- `/api/sellers?product_id=product_d24b597176bdf2a82035dcc2` (default location, 1 km): 24 rows, clusters چارسو 6 · علاءالدین 6 · بازار موبایل ایران 4 · بزرگمهر 2 · خانه موبایل 2, 5 category-only shops; `installment=1` → 1 row + relaxation «قسطی +23».
+- Timing: `findSellers` 4–16 ms server-side (Server-Timing header); ~225 ms end-to-end in `next dev` (dev-server overhead).
+- Sample row: see `/api/sellers` — `{offer_id, shop_name, price, price_flag, freshness, price_age_days, distance_m, open{known,open,label}, mall{name,floor_label,unit_label}, conditions{…}, score, score_breakdown, why[]}`.
+
+Next: M3 agent + core UI.
