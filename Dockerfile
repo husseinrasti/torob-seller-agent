@@ -2,6 +2,9 @@
 
 # --- base: node + pnpm ------------------------------------------------------------
 FROM node:22-alpine AS base
+# optional npm mirror for networks where registry.npmjs.org is slow/blocked
+ARG NPM_REGISTRY=https://registry.npmjs.org/
+ENV COREPACK_NPM_REGISTRY=${NPM_REGISTRY} npm_config_registry=${NPM_REGISTRY}
 RUN corepack enable && corepack prepare pnpm@10.6.5 --activate
 WORKDIR /app
 ENV NEXT_TELEMETRY_DISABLED=1
