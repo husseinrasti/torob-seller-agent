@@ -100,3 +100,27 @@ Acceptance:
 - `pnpm typecheck && pnpm lint && pnpm test && pnpm golden` green (99 unit tests; golden 15/15 + 10/10).
 
 Next: M6 deployment.
+
+## M6 — Deploy ✅ (local end-to-end; VPS run is the owner's, see docs/DEPLOY.md)
+
+Done:
+- Dockerfile (Node 22 alpine, pnpm, Next standalone, esbuild-bundled `migrate.cjs`/`seed.cjs`, non-root, HEALTHCHECK), docker-compose (db with healthcheck + volume, app with `AUTO_SEED`, Caddy with `{$APP_DOMAIN}`), Caddyfile.
+- README (fa + en pitch, screenshots, criteria map, mermaid architecture, quick start, env table, honesty note, dataset notes), `docs/DEPLOY.md`, `docs/DEMO.md`.
+
+Acceptance (local, fresh compose project and volumes, Caddy on :8089):
+- `docker compose up -d --build` → `[migrate] applied` → `[seed +31.3s] done: {"shops":6476,"products":225903,"offers":331506}` → `✓ Ready` → `/api/healthz` ok through Caddy; app container `healthy`; image 355 MB.
+- `pnpm scenario http://localhost:8089` → **20/20** through Caddy.
+- `docker compose restart app` / recreate → data kept, seed skipped (`--if-empty`), healthz green.
+- `docker compose run --rm app node scripts/seed.cjs --if-empty` runs the bundled seed.
+
+## Final status
+
+- `pnpm typecheck && pnpm lint && pnpm test && pnpm golden` → green (99 unit tests; golden 15/15 queries + 10/10 seller checks).
+- Demo scenario §13 steps 1–7: `pnpm scenario` 20/20 (dev, production build and Docker), `?demo_time=` and `/demo-reset` supported.
+- CI: GitHub Actions (install → typecheck → lint → test) on every push.
+- Parsed malls for 4,088 shops (after parser refinements in M1).
+
+Known issues / gaps:
+- **LLM providers not verified live — no API keys were available** (`pnpm llm-check`: openai, google and openrouter all skipped). The agent was verified with the offline rule model and with a failing provider (automatic fallback + Persian notice). Add a key to `.env` and run `pnpm llm-check` (and `LLM_PROVIDER=<p> pnpm llm-check --provider=<p>`).
+- Product images (image.torob.com) did not load from the build machine (TLS error); a placeholder is shown until an image loads.
+- Live demo URL and the official dataset link are placeholders in README until the owner deploys / adds the link.

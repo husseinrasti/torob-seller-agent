@@ -42,3 +42,7 @@ One line per deviation from `docs/01-master-build-spec.md`, with the reason.
 | 36 | M5 | Visit plan input defaults to shortlist ∪ confirmed/pending follow-ups (never out of stock / no answer); a price change appears in the plan only after «قبول قیمت جدید». | The plan should only send people where the product is (likely) available at an accepted price. |
 | 37 | M5 | Dark mode implemented (next-themes, toggle in the header; light by default). | Cheap with the existing tokens; spec lists it as optional. |
 | 38 | M5 | `pnpm scenario` (Playwright + system Chrome) is the end-to-end acceptance for spec §13 steps 1–7 incl. a Persian-digits audit; screenshots in `docs/screenshots/`. | One reproducible command instead of manual clicking. |
+| 39 | M6 | `/demo-reset` redirects with a relative `Location`. | Behind Caddy, the standalone server's own origin is `0.0.0.0:3000`, not the public host. |
+| 40 | M6 | The container entrypoint runs its arguments when given (`docker compose run --rm app node scripts/seed.cjs`), else migrate → auto-seed (`--if-empty`) → server. | Manual reseed without a second image. |
+| 41 | M6 | Optional `NPM_REGISTRY` build arg and `POSTGRES_PASSWORD` in `.env`; DB port bound to 127.0.0.1. | Iranian servers often need an npm mirror; the database is not exposed publicly. |
+| 42 | M6 | The official dataset URL is not in the repository docs, so the README carries a marked placeholder; DEPLOY.md copies the CSVs with `scp`. | Avoid inventing a download link. |
