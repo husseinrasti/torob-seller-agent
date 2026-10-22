@@ -56,3 +56,22 @@ Acceptance results:
 - Sample row: see `/api/sellers` — `{offer_id, shop_name, price, price_flag, freshness, price_age_days, distance_m, open{known,open,label}, mall{name,floor_label,unit_label}, conditions{…}, score, score_breakdown, why[]}`.
 
 Next: M3 agent + core UI.
+
+## M3 — Agent + core UI ✅ (provider switch not verifiable: no keys)
+
+Done:
+- `lib/agent/{state,tools,system-prompt,suggest,offline-model,types}.ts`, `/api/chat` (AI SDK v7 `streamText` + tools, `stepCountIs(5)`, 25 s step timeout, Persian errors), `/api/session` GET/PATCH, `/api/shop`, `/api/places`, hidden `/demo-reset`.
+- Mobile RTL UI: header (demo-time/offline badges), sticky ContextBar + sheets (location: GPS / search / MapLibre pick; radius; price cap; conditions + intent), hero with the 4 scenario chips, ProductCards (+compare selection), CompareTable, SellerList (live re-filter, mall clusters, sort, relaxation banner, «ممکن است داشته باشند (فقط دسته فعالیت)»), SellerCard (three-field block), shop details sheet (score breakdown, nav links), SuggestedActions, Composer, lazy MapPanel.
+- `pnpm scenario` drives spec §13 on a 390px viewport with screenshots and assertions; `pnpm smoke`.
+
+Acceptance results (`pnpm scenario --upto=4`, offline model, demo time Sunday 16:00): **11/11 checks pass** in ~16 s —
+chip → 4 product cards with «چرا»; compare 2 → table → «انتخاب»; 24 sellers in 1 km with cluster chips; map panel with 30 markers;
+«باز الان» + 500 m → 18 sellers with **0 calls to /api/chat**; «قسطی» → 0 + «حذف فیلتر قسطی (+۱۸)»; three fields on every card;
+«چرا این اول شد؟» answered from why/score_breakdown; no horizontal scroll; no console errors.
+- Provider failure path verified with a fake OpenAI key: Persian notice + offline answer; UI actions still render their cards.
+
+Known gaps:
+- **LLM provider switching (openai/google/openrouter) not verified — no API keys in `.env`.** Code path is a pure env switch (`lib/llm.ts`).
+- Product images from image.torob.com do not load from this machine (TLS error); a placeholder is shown.
+
+Next: M4 follow-ups, alternatives, checklist.
