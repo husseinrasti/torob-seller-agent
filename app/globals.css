@@ -1,0 +1,131 @@
+@import "tailwindcss";
+@import "tw-animate-css";
+@import "shadcn/tailwind.css";
+
+@custom-variant dark (&:is(.dark *));
+
+@theme inline {
+  --font-heading: var(--font-vazirmatn), ui-sans-serif, system-ui, sans-serif;
+  --font-sans: var(--font-vazirmatn), ui-sans-serif, system-ui, sans-serif;
+  --color-ring: var(--ring);
+  --color-input: var(--input);
+  --color-border: var(--border);
+  --color-destructive: var(--destructive);
+  --color-accent-foreground: var(--accent-foreground);
+  --color-accent: var(--accent);
+  --color-muted-foreground: var(--muted-foreground);
+  --color-muted: var(--muted);
+  --color-secondary-foreground: var(--secondary-foreground);
+  --color-secondary: var(--secondary);
+  --color-primary-foreground: var(--primary-foreground);
+  --color-primary: var(--primary);
+  --color-popover-foreground: var(--popover-foreground);
+  --color-popover: var(--popover);
+  --color-card-foreground: var(--card-foreground);
+  --color-card: var(--card);
+  --color-foreground: var(--foreground);
+  --color-background: var(--background);
+  /* status colors for the three-field transparency badges */
+  --color-fresh: var(--fresh);
+  --color-fresh-bg: var(--fresh-bg);
+  --color-recent: var(--recent);
+  --color-recent-bg: var(--recent-bg);
+  --color-stale: var(--stale);
+  --color-stale-bg: var(--stale-bg);
+  --color-info: var(--info);
+  --color-info-bg: var(--info-bg);
+  --radius-sm: calc(var(--radius) * 0.6);
+  --radius-md: calc(var(--radius) * 0.8);
+  --radius-lg: var(--radius);
+  --radius-xl: calc(var(--radius) * 1.4);
+  --radius-2xl: calc(var(--radius) * 1.8);
+  --radius-3xl: calc(var(--radius) * 2.2);
+  --radius-4xl: calc(var(--radius) * 2.6);
+}
+
+:root {
+  --background: oklch(1 0 0);
+  --foreground: oklch(0.18 0.01 200);
+  --card: oklch(1 0 0);
+  --card-foreground: oklch(0.18 0.01 200);
+  --popover: oklch(1 0 0);
+  --popover-foreground: oklch(0.18 0.01 200);
+  /* teal accent: deliberately not Torob's brand red */
+  --primary: oklch(0.51 0.1 186);
+  --primary-foreground: oklch(0.985 0 0);
+  --secondary: oklch(0.96 0.012 186);
+  --secondary-foreground: oklch(0.3 0.06 186);
+  --muted: oklch(0.967 0.003 200);
+  --muted-foreground: oklch(0.5 0.01 200);
+  --accent: oklch(0.95 0.02 186);
+  --accent-foreground: oklch(0.3 0.06 186);
+  --destructive: oklch(0.577 0.245 27.325);
+  --border: oklch(0.915 0.005 200);
+  --input: oklch(0.9 0.005 200);
+  --ring: oklch(0.6 0.1 186);
+  --fresh: oklch(0.45 0.13 150);
+  --fresh-bg: oklch(0.95 0.05 150);
+  --recent: oklch(0.5 0.12 70);
+  --recent-bg: oklch(0.96 0.06 85);
+  --stale: oklch(0.5 0.19 27);
+  --stale-bg: oklch(0.95 0.035 27);
+  --info: oklch(0.45 0.12 250);
+  --info-bg: oklch(0.95 0.03 250);
+  --radius: 0.75rem;
+}
+
+.dark {
+  --background: oklch(0.17 0.01 200);
+  --foreground: oklch(0.97 0 0);
+  --card: oklch(0.22 0.01 200);
+  --card-foreground: oklch(0.97 0 0);
+  --popover: oklch(0.22 0.01 200);
+  --popover-foreground: oklch(0.97 0 0);
+  --primary: oklch(0.7 0.11 186);
+  --primary-foreground: oklch(0.15 0.02 186);
+  --secondary: oklch(0.28 0.02 186);
+  --secondary-foreground: oklch(0.95 0 0);
+  --muted: oklch(0.26 0.01 200);
+  --muted-foreground: oklch(0.72 0.01 200);
+  --accent: oklch(0.3 0.03 186);
+  --accent-foreground: oklch(0.95 0 0);
+  --destructive: oklch(0.704 0.191 22.216);
+  --border: oklch(1 0 0 / 10%);
+  --input: oklch(1 0 0 / 15%);
+  --ring: oklch(0.6 0.1 186);
+  --fresh: oklch(0.8 0.13 150);
+  --fresh-bg: oklch(0.3 0.06 150);
+  --recent: oklch(0.85 0.12 85);
+  --recent-bg: oklch(0.32 0.06 70);
+  --stale: oklch(0.78 0.14 27);
+  --stale-bg: oklch(0.3 0.07 27);
+  --info: oklch(0.8 0.1 250);
+  --info-bg: oklch(0.3 0.05 250);
+}
+
+@layer base {
+  * {
+    @apply border-border outline-ring/50;
+  }
+  html {
+    @apply font-sans;
+    -webkit-tap-highlight-color: transparent;
+  }
+  body {
+    @apply bg-background text-foreground;
+    overflow-x: hidden;
+  }
+}
+
+/* Latin/numeric fragments (model names, URLs) must not be reordered inside RTL text. */
+.ltr-iso {
+  direction: ltr;
+  unicode-bidi: isolate;
+}
+
+.no-scrollbar::-webkit-scrollbar {
+  display: none;
+}
+.no-scrollbar {
+  scrollbar-width: none;
+}

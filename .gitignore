@@ -1,0 +1,39 @@
+# dependencies
+node_modules/
+.pnpm-store/
+
+# next.js
+.next/
+out/
+build/
+next-env.d.ts
+*.tsbuildinfo
+
+# env & secrets
+.env
+.env.*
+!.env.example
+.env.*.local
+
+# dataset (download separately, see README)
+data/*.csv
+data/*.zip
+
+# local challenge media (not part of the submission)
+video/
+
+# testing / reports
+coverage/
+playwright-report/
+test-results/
+docs/screenshots/tmp/
+
+# logs
+*.log
+npm-debug.log*
+pnpm-debug.log*
+
+# OS / editors
+.DS_Store
+.idea/
+.vscode/
