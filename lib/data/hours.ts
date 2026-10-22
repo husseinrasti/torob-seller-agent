@@ -57,17 +57,22 @@ function minToHHMM(min: number): string {
   return `${String(Math.floor(m / 60)).padStart(2, '0')}:${String(m % 60).padStart(2, '0')}`;
 }
 
-/** Declared shifts of one day as [start, end) minute ranges; end ≤ start means "until midnight". */
+/**
+ * Declared shifts of one day as [start, end) minute ranges; end < start means "until midnight".
+ * Zero-length shifts («00:00–00:00») are placeholders in the data and are ignored.
+ */
 function shiftsOf(day: DayHours | undefined): Array<[number, number]> | null {
   if (!day || day.status !== 'declared' || !day.shifts?.length) return null;
-  return day.shifts
+  const shifts = day.shifts
     .map((s): [number, number] => {
       const start = toMin(s.start_time);
       let end = toMin(s.end_time);
-      if (end <= start) end = 1440;
+      if (end < start) end = 1440;
       return [start, end];
     })
+    .filter(([start, end]) => end > start)
     .sort((a, b) => a[0] - b[0]);
+  return shifts.length ? shifts : null;
 }
 
 export function hoursKnown(weekly: WeeklyHours): boolean {

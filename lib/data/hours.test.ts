@@ -65,6 +65,20 @@ describe('openState', () => {
     expect(s).toMatchObject({ known: false, open: null });
   });
 
+  it('ignores placeholder 00:00–00:00 shifts', () => {
+    const week: WeeklyHours = {
+      sun: {
+        shifts: [
+          { end_time: '22:00:00', start_time: '11:00:00' },
+          { end_time: '00:00:00', start_time: '00:00:00' },
+        ],
+        status: 'declared',
+      },
+    };
+    expect(openState(week, at('2026-10-25T16:00')).label).toBe('باز است · تا ۲۲:۰۰');
+    expect(openState(week, at('2026-10-25T23:00')).open).toBe(false);
+  });
+
   it('empty hours are unknown', () => {
     expect(openState({}, at('2026-10-25T16:00'))).toMatchObject({ known: false, open: null, label: 'ساعت کاری ثبت نشده' });
     expect(openState(null, at('2026-10-25T16:00')).known).toBe(false);
