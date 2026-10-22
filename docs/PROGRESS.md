@@ -75,3 +75,14 @@ Known gaps:
 - Product images from image.torob.com do not load from this machine (TLS error); a placeholder is shown.
 
 Next: M4 follow-ups, alternatives, checklist.
+
+## M4 — Follow-ups, alternatives, checklist ✅
+
+Done:
+- `lib/sim/seller.ts` (sha256 ground truth, probability buckets, closed-shop rules), `lib/sim/persona.ts` (LLM ≤ 3 s, price-guarded, templates), `lib/sim/followups.ts`, `POST/GET /api/followup`.
+- Tools `contact_seller`, `find_alternatives`, `purchase_checklist`; FollowupBoard (1 s polling, skeletons, transcripts, «جایگزین پیدا کن», «قبول قیمت جدید», disclaimer), AlternativesPanel (two tabs), Checklist; seller cards' «موجودی» badge updates live.
+- Unit tests for simulator determinism and buckets (94 tests total).
+
+Acceptance (`pnpm scenario --upto=5`): **15/15 checks** — 3 follow-ups resolve in ~4 s with confirmed / price_changed / out_of_stock, transcripts visible, disclaimer visible, out_of_stock → «خودکار» alternatives with the same product in the same mall first; checklist for a phone returns رجیستری/پلمب/سریال گارانتی/تست دوربین و باتری/فاکتور.
+
+Next: M5 trip plan + polish.
