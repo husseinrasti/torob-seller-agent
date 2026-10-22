@@ -7,7 +7,7 @@ export type ChatActions = {
   /** free text → the agent decides */
   sendText: (text: string) => void;
   /** run a tool now (UI action), shown as the user's words, then the agent comments */
-  sendAction: (text: string, tool: string, input: Record<string, unknown>) => void;
+  sendAction: (text: string, tool: string, input: Record<string, unknown>, opts?: { auto?: boolean }) => void;
   applySuggestion: (s: Suggestion) => void;
   /** replace a tool part's output in the chat history (e.g. a seller list re-filtered by the ContextBar) */
   updateToolOutput: (toolCallId: string, output: unknown) => void;

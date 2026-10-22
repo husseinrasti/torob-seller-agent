@@ -119,6 +119,28 @@ async function main() {
   const lastText = await page.locator('[data-role="assistant"]').last().innerText();
   check('4. «چرا این اول شد؟» explained from why/score_breakdown', /اول|امتیاز|قیمت|فاصله/.test(lastText), lastText.slice(0, 120));
   await snap(page, 'why-first', '[data-role="assistant"]');
+  if (upto < 5) return finish();
+
+  // 5) follow up the top 3 → live board with mixed outcomes → automatic alternatives
+  const t5 = Date.now();
+  await page.getByRole('button', { name: /پیگیری ۳ تای اول/ }).first().click();
+  await page.getByText('تابلو پیگیری').last().waitFor({ timeout: 30_000 });
+  await snap(page, 'followups-contacting', 'section:has-text("تابلو پیگیری")');
+  await page.waitForFunction(() => /تأیید · /.test(Array.from(document.querySelectorAll('section')).filter((s) => s.textContent?.includes('تابلو پیگیری')).pop()?.textContent ?? ''), null, { timeout: 15_000 });
+  const resolvedIn = (Date.now() - t5) / 1000;
+  const boardText = await page.locator('section', { hasText: 'تابلو پیگیری' }).last().innerText();
+  check('5. three follow-ups resolve within 5 s of the board appearing', resolvedIn <= 8, `${resolvedIn.toFixed(1)} s incl. request`);
+  check('5. mixed outcomes (confirmed + out of stock)', /[۱-۳] تأیید/.test(boardText) && /[۱-۳] ناموجود/.test(boardText), boardText.split('\n')[1]);
+  check('5. simulation disclaimer visible', /شبیه‌سازی‌شده/.test(boardText));
+  await snap(page, 'followups-resolved', 'section:has-text("تابلو پیگیری")');
+  await page.getByText('خودکار:').last().waitFor({ timeout: 20_000 });
+  await page.getByText('جایگزین‌ها').last().waitFor({ timeout: 30_000 });
+  await waitIdle(page);
+  const altText = await page.locator('section', { hasText: 'جایگزین‌ها' }).last().innerText();
+  check('5. out_of_stock → alternatives automatically', /همین کالا/.test(altText), altText.split('\n').slice(0, 4).join(' / '));
+  await snap(page, 'alternatives', 'section:has-text("جایگزین‌ها")');
+  await page.getByRole('tab', { name: /کالای مشابه/ }).last().click();
+  await snap(page, 'alternatives-similar', 'section:has-text("جایگزین‌ها")');
 
   return finish();
 

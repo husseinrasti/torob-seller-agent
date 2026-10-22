@@ -1,6 +1,6 @@
 'use client';
 
-import { createContext, useCallback, useContext, useMemo, useState } from 'react';
+import { createContext, useCallback, useContext, useMemo, useRef, useState } from 'react';
 import type { FollowupStatus } from '@/lib/agent/state';
 import type { Availability } from '@/components/cards/badges';
 
@@ -20,6 +20,8 @@ type Store = {
   byOffer: Record<string, FollowupInfo>;
   upsert: (items: FollowupInfo[]) => void;
   availabilityFor: (offerId: string, fallback?: FollowupStatus) => Availability;
+  /** true the first time it is called for an id (auto-alternatives fire once per follow-up) */
+  claimAuto: (followupId: string) => boolean;
 };
 
 const Ctx = createContext<Store | null>(null);
@@ -48,7 +50,13 @@ export function FollowupsProvider({ children }: { children: React.ReactNode }) {
     },
     [byOffer],
   );
-  const value = useMemo(() => ({ byOffer, upsert, availabilityFor }), [byOffer, upsert, availabilityFor]);
+  const claimed = useRef(new Set<string>());
+  const claimAuto = useCallback((id: string) => {
+    if (claimed.current.has(id)) return false;
+    claimed.current.add(id);
+    return true;
+  }, []);
+  const value = useMemo(() => ({ byOffer, upsert, availabilityFor, claimAuto }), [byOffer, upsert, availabilityFor, claimAuto]);
   return <Ctx.Provider value={value}>{children}</Ctx.Provider>;
 }
 

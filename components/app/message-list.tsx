@@ -2,7 +2,7 @@
 
 import { memo } from 'react';
 import type { UIMessage } from 'ai';
-import { Bot, Loader2 } from 'lucide-react';
+import { BellRing, Bot, Loader2 } from 'lucide-react';
 import { Skeleton } from '@/components/ui/skeleton';
 import type { ActionMetadata, ToolOutput } from '@/lib/agent/types';
 import { ProductCards } from '@/components/cards/product-cards';
@@ -92,7 +92,7 @@ function OutputView({ output, toolCallId, isLatestSellers, isLastMessage }: { ou
     case 'clarify':
       return <ClarifyChips output={output} isLast={isLastMessage} />;
     default:
-      return <ExtraToolView output={output} isLastMessage={isLastMessage} />;
+      return <ExtraToolView output={output} toolCallId={toolCallId} isLastMessage={isLastMessage} />;
   }
 }
 
@@ -133,7 +133,18 @@ const AssistantMessage = memo(function AssistantMessage({
 
 function UserMessage({ message }: { message: UIMessage }) {
   const text = message.parts.map((p) => (p.type === 'text' ? p.text : '')).join(' ');
-  const isAction = Boolean((message.metadata as ActionMetadata | undefined)?.action);
+  const meta = message.metadata as ActionMetadata | undefined;
+  const isAction = Boolean(meta?.action);
+  if (meta?.auto) {
+    return (
+      <div className="flex justify-center" data-role="event">
+        <p className="inline-flex items-center gap-1.5 rounded-full bg-info-bg px-3 py-1.5 text-xs text-info">
+          <BellRing className="size-3.5" />
+          خودکار: {text}
+        </p>
+      </div>
+    );
+  }
   return (
     <div className="flex justify-end" data-role="user">
       <p className={`max-w-[85%] rounded-2xl rounded-ee-md px-3.5 py-2 text-sm leading-6 ${isAction ? 'bg-secondary text-secondary-foreground' : 'bg-primary text-primary-foreground'}`}>{text}</p>

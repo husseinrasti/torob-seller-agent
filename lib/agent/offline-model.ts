@@ -101,10 +101,21 @@ function summarize(toolName: string, v: Json | null, error?: string): string {
     }
     case 'shop_details':
       return `«${v.shop}»${v.mall ? ` — ${v.mall}` : ''}؛ ${v.open}.`;
-    case 'contact_seller':
-      return 'پیگیری شروع شد؛ نتیجه هر فروشنده روی تابلو پیگیری به‌روز می‌شود.';
-    case 'find_alternatives':
-      return 'چند جایگزین پیدا کردم: همین کالا در فروشگاه‌های دیگر و کالاهای مشابه در همان پاساژ.';
+    case 'contact_seller': {
+      const n = ((v.started as Json[] | undefined) ?? []).length;
+      return `به ${toFaDigits(n)} فروشنده پیام دادم؛ جواب‌ها چند ثانیه دیگر روی تابلو پیگیری می‌آید و اگر کسی کالا را نداشت، خودم جایگزین پیدا می‌کنم.`;
+    }
+    case 'find_alternatives': {
+      const same = (v.same_product as Json[] | undefined) ?? [];
+      const similar = (v.similar as Json[] | undefined) ?? [];
+      if (!same.length && !similar.length) return 'جایگزین مناسبی در این محدوده پیدا نشد؛ شعاع را بیشتر کنید.';
+      const s0 = same[0];
+      const first = s0
+        ? `همین کالا در «${s0.shop}»${s0.same_mall ? ' در همین پاساژ' : ''}${s0.mall ? ` (${s0.mall})` : ''} ${s0.price ? `با ${formatToman(Number(s0.price))}` : 'با قیمت ثبت‌نشده'} هست`
+        : '';
+      const sim = similar.length ? `${first ? '؛ ' : ''}${toFaDigits(similar.length)} کالای مشابه هم در همان مغازه/پاساژ پیدا شد` : '';
+      return `${first}${sim}. برای اطمینان، پیگیری‌اش کنید.`;
+    }
     case 'plan_trip':
       return 'برنامه مراجعه آماده است؛ ترتیب، زمان رسیدن و باز بودن هر مغازه را ببینید و لینکش را به اشتراک بگذارید.';
     case 'purchase_checklist':

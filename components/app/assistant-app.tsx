@@ -17,12 +17,18 @@ import { Composer } from './composer';
 import { SuggestedActions } from './suggested-actions';
 import { MapPanel } from './map-panel';
 
+/** Suggestions of the most recent tool output that has any (text-only replies keep the previous chips). */
 function lastToolSuggestions(messages: UIMessage[]): Suggestion[] | null {
-  const last = messages[messages.length - 1];
-  if (!last || last.role !== 'assistant') return null;
-  for (let i = last.parts.length - 1; i >= 0; i--) {
-    const p = last.parts[i] as { type: string; state?: string; output?: { suggested_actions?: Suggestion[] } };
-    if (p.type.startsWith('tool-') && p.state === 'output-available' && p.output?.suggested_actions?.length) return p.output.suggested_actions;
+  for (let m = messages.length - 1, seen = 0; m >= 0 && seen < 4; m--) {
+    const msg = messages[m];
+    if (msg.role !== 'assistant') continue;
+    seen++;
+    for (let i = msg.parts.length - 1; i >= 0; i--) {
+      const p = msg.parts[i] as { type: string; state?: string; output?: { suggested_actions?: Suggestion[] } };
+      if (!p.type.startsWith('tool-') || p.state !== 'output-available') continue;
+      if (p.output?.suggested_actions?.length) return p.output.suggested_actions;
+      if (p.output?.suggested_actions) return null; // latest tool explicitly has none → session suggestions
+    }
   }
   return null;
 }
@@ -58,10 +64,10 @@ function Shell() {
       clearError();
       sendMessage({ text });
     };
-    const sendAction = (text: string, tool: string, input: Record<string, unknown>) => {
+    const sendAction = (text: string, tool: string, input: Record<string, unknown>, opts?: { auto?: boolean }) => {
       if (busy) return;
       clearError();
-      sendMessage({ text, metadata: { action: { tool, input } } });
+      sendMessage({ text, metadata: { action: { tool, input }, auto: opts?.auto ?? false } });
     };
     return {
       sendText,

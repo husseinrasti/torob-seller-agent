@@ -10,14 +10,22 @@ import { toFaDigits } from '../fa/digits';
 import { FILTER_LABEL, type Filters } from '../search/score';
 import type { SessionState } from './state';
 import type { Suggestion } from './suggest';
+import { startFollowups } from '../sim/followups';
+import { findAlternatives } from '../search/alternatives';
+import { purchaseChecklist } from './checklist';
 import type {
+  AlternativesOutput,
+  ChecklistOutput,
   ClarifyOutput,
   CompareOutput,
   ContextOutput,
+  FollowupsOutput,
   ProductsOutput,
   SellersOutput,
   ShopOutput,
 } from './types';
+
+export const SIM_DISCLAIMER = 'شبیه‌سازی‌شده — در نسخه واقعی از طریق پیام‌رسان/تماس ترب انجام می‌شود.';
 
 export type ToolCtx = { sessionId: string; state: SessionState; now: Date };
 
@@ -255,6 +263,63 @@ export const TOOL_DEFS = {
       payment: o.payment,
       other_offers: o.other_offers.map((x) => ({ title: x.title, price: x.price, price_age_days: x.price_age_days })),
     }),
+  }),
+
+  contact_seller: def({
+    description:
+      'Step 4: follow up with sellers (simulated message or call) to confirm stock and today\'s price. Starts asynchronous follow-ups; results appear on the follow-up board within seconds. Use for up to 5 offers.',
+    input: z.object({
+      offer_ids: z.array(z.string()).min(1).max(5),
+      channel: z.enum(['message', 'call']).default('message'),
+      question: z.string().max(140).optional(),
+    }),
+    run: async (i, ctx): Promise<FollowupsOutput> => {
+      const items = await startFollowups({ sessionId: ctx.sessionId, offerIds: i.offer_ids, channel: i.channel, question: i.question, now: ctx.now });
+      for (const it of items) ctx.state.followups = { ...ctx.state.followups, [it.offer_id]: 'contacting' };
+      return { ui: 'followups', channel: i.channel, items, disclaimer: SIM_DISCLAIMER, suggested_actions: [] };
+    },
+    toModel: (o) => ({
+      started: o.items.map((x) => ({ followup_id: x.id, offer_id: x.offer_id, shop: x.shop_name, status: x.status })),
+      note: 'Results arrive asynchronously on the board; the UI will ask for alternatives automatically if a seller is out of stock.',
+    }),
+  }),
+
+  find_alternatives: def({
+    description:
+      'Step 4: when a seller is out of stock, changed the price, did not answer or is closed — (a) the same product at other sellers (same mall first) and (b) similar products in the same shop/mall within ±20% price. Call it WITHOUT asking after an out_of_stock follow-up.',
+    input: z.object({ offer_id: z.string(), reason: z.enum(['out_of_stock', 'price_changed', 'closed', 'no_answer']) }),
+    run: async (i, ctx): Promise<AlternativesOutput> => {
+      const st = ctx.state;
+      const bad = Object.entries(st.followups)
+        .filter(([, v]) => v === 'out_of_stock' || v === 'no_answer')
+        .map(([offer]) => offer);
+      const badShops = bad.length ? (await q<{ shop_id: string }>('SELECT shop_id FROM offers WHERE offer_id = ANY($1::text[])', [bad])).map((r) => r.shop_id) : [];
+      const res = await findAlternatives({ offerId: i.offer_id, reason: i.reason, lat: st.location.lat, lon: st.location.lon, radius_m: st.radius_m, now: ctx.now, excludeShopIds: badShops });
+      if (!res) throw new Error('پیشنهاد اولیه پیدا نشد');
+      const suggested: Suggestion[] = res.same_product.length
+        ? [{ kind: 'action', label: 'پیگیری جایگزین اول', text: `موجودی «${res.same_product[0].shop_name}» را هم پیگیری کن`, tool: 'contact_seller', input: { offer_ids: [res.same_product[0].offer_id], channel: 'message' } }]
+        : [];
+      return { ui: 'alternatives', ...res, suggested_actions: suggested };
+    },
+    toModel: (o) => ({
+      reason: o.reason,
+      origin: { shop: o.origin.shop_name, mall: o.origin.mall_name },
+      same_product: o.same_product.map((r) => ({ offer_id: r.offer_id, shop: r.shop_name, price: r.price, distance_m: r.distance_m, same_mall: r.same_mall, mall: mallText(r.mall), open: r.open.label })),
+      similar: o.similar.map((x) => ({ offer_id: x.offer_id, title: x.title, price: x.price, shop: x.shop_name, why: x.why })),
+    }),
+  }),
+
+  purchase_checklist: def({
+    description: 'What to check in person before paying (5–7 bullets) for the chosen product\'s category. Offer it once before the visit plan.',
+    input: z.object({ product_id: z.string().optional() }),
+    run: async (i, ctx): Promise<ChecklistOutput> => {
+      const pid = i.product_id ?? ctx.state.chosenProduct ?? ctx.state.candidates[0];
+      const [p] = pid ? await q<{ persian_title: string; category_name: string | null }>('SELECT persian_title, category_name FROM products WHERE product_id = $1', [pid]) : [];
+      const res = await purchaseChecklist(p?.category_name ?? null, p?.persian_title ?? 'کالا');
+      ctx.state.checklistOffered = true;
+      return { ui: 'checklist', product_title: p?.persian_title ?? '', category: p?.category_name ?? null, items: res.items, source: res.source };
+    },
+    toModel: (o) => ({ category: o.category, items: o.items }),
   }),
 };
 
