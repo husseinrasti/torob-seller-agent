@@ -37,7 +37,7 @@ function Transcript({ item }: { item: FollowupItem }) {
               )}
             >
               {l.from !== 'system' && <span className="block text-[10px] text-muted-foreground">{l.from === 'agent' ? 'همراه خرید' : item.shop_name}</span>}
-              {l.text}
+              {faText(l.text)}
             </li>
           ))}
         </ol>
@@ -120,8 +120,10 @@ export function FollowupBoard({ output, toolCallId }: { output: FollowupsOutput;
   const [items, setItems] = useState<FollowupItem[]>(output.items);
   const { upsert, claimAuto } = useFollowups();
   const { sendAction, busy, updateToolOutput } = useChatActions();
-  const { refresh } = useSession();
+  const { refresh, api } = useSession();
   const synced = useRef(false);
+  // replies that were already in when this board mounted (a resumed chat) must not trigger alternatives again
+  const resolvedAtMount = useRef(new Set(output.items.filter(resolved).map((i) => i.id)));
   const allDone = items.length > 0 && items.every(resolved);
 
   useEffect(() => {
@@ -133,7 +135,7 @@ export function FollowupBoard({ output, toolCallId }: { output: FollowupsOutput;
     let stop = false;
     const t = setInterval(async () => {
       try {
-        const r = await fetch(`/api/followup?ids=${items.map((i) => i.id).join(',')}`, { cache: 'no-store' });
+        const r = await api(`/api/followup?ids=${items.map((i) => i.id).join(',')}`);
         const d = await r.json();
         if (!stop && d.items) setItems(d.items);
       } catch {
@@ -144,7 +146,7 @@ export function FollowupBoard({ output, toolCallId }: { output: FollowupsOutput;
       stop = true;
       clearInterval(t);
     };
-  }, [allDone, items]);
+  }, [allDone, items, api]);
 
   // once everything is back: let the agent see the outcomes, refresh suggestions (plan, …)
   useEffect(() => {
@@ -157,7 +159,7 @@ export function FollowupBoard({ output, toolCallId }: { output: FollowupsOutput;
   // out of stock → ask for alternatives automatically (once per follow-up)
   useEffect(() => {
     if (busy) return;
-    const oos = items.find((i) => i.status === 'out_of_stock');
+    const oos = items.find((i) => i.status === 'out_of_stock' && !resolvedAtMount.current.has(i.id));
     if (!oos || !claimAuto(oos.id)) return;
     sendAction(`«${oos.shop_name}» این کالا را ندارد؛ جایگزین پیدا کن`, 'find_alternatives', { offer_id: oos.offer_id, reason: 'out_of_stock' }, { auto: true });
   }, [items, busy, claimAuto, sendAction]);

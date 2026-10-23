@@ -1,7 +1,10 @@
-import { cookies } from 'next/headers';
+import type { UIMessage } from 'ai';
 import { z } from 'zod';
 import { q } from '../db/client';
 import { DEFAULT_LOCATION } from '../geo';
+import { HttpError, UUID_RE } from '../http';
+import { requireUser, type User } from '../auth';
+import { initialStateFrom } from './memory';
 import type { Intent } from '../search/score';
 
 export type FollowupStatus = 'pending' | 'contacting' | 'confirmed' | 'out_of_stock' | 'price_changed' | 'no_answer';
@@ -44,8 +47,6 @@ export const DEFAULT_STATE: SessionState = {
   shortlist: [],
   followups: {},
 };
-
-export const SESSION_COOKIE = 'hk_sid';
 
 const LocationSchema = z.object({
   lat: z.number().min(25).max(40),
@@ -112,33 +113,77 @@ function normalize(raw: unknown): SessionState {
   return { ...DEFAULT_STATE, ...s, location: s.location ?? DEFAULT_STATE.location, filters: s.filters ?? {}, followups: s.followups ?? {} };
 }
 
-export type Session = { id: string; state: SessionState };
+/** A chat: its id doubles as the session id used by follow-ups and plans. */
+export type Session = { id: string; state: SessionState; user: User; exists: boolean };
 
-/** Reads the session cookie, creating the session row (and cookie) when missing. Route handlers only. */
-export async function getOrCreateSession(): Promise<Session> {
-  const jar = await cookies();
-  const id = jar.get(SESSION_COOKIE)?.value;
-  if (id && /^[0-9a-f-]{36}$/.test(id)) {
-    const rows = await q<{ state: unknown }>('SELECT state FROM sessions WHERE id = $1', [id]);
-    if (rows[0]) return { id, state: normalize(rows[0].state) };
+/**
+ * The signed-in user's chat `chatId`. Missing chats are created (owned by the user, starting from the
+ * remembered location) unless `create` is false — then an unsaved default state is returned.
+ */
+export async function chatSession(chatId: string | null | undefined, opts: { create?: boolean } = {}): Promise<Session> {
+  const user = await requireUser();
+  if (!chatId || !UUID_RE.test(chatId)) throw new HttpError(400, 'شناسه گفتگو معتبر نیست');
+  const [row] = await q<{ state: unknown; user_id: string | null }>('SELECT state, user_id FROM sessions WHERE id = $1', [chatId]);
+  if (row) {
+    if (row.user_id && row.user_id !== user.id) throw new HttpError(404, 'گفتگو پیدا نشد');
+    if (!row.user_id) await q('UPDATE sessions SET user_id = $2 WHERE id = $1', [chatId, user.id]);
+    return { id: chatId, state: normalize(row.state), user, exists: true };
   }
-  const [row] = await q<{ id: string }>('INSERT INTO sessions (state) VALUES ($1) RETURNING id', [JSON.stringify(DEFAULT_STATE)]);
-  jar.set(SESSION_COOKIE, row.id, { httpOnly: true, sameSite: 'lax', path: '/', maxAge: 60 * 60 * 24 * 30, secure: process.env.NODE_ENV === 'production' && process.env.APP_URL?.startsWith('https') });
-  return { id: row.id, state: { ...DEFAULT_STATE } };
+  const state = initialStateFrom(user.memory);
+  if (opts.create === false) return { id: chatId, state, user, exists: false };
+  await q('INSERT INTO sessions (id, user_id, state) VALUES ($1, $2, $3) ON CONFLICT (id) DO NOTHING', [chatId, user.id, JSON.stringify(state)]);
+  return { id: chatId, state, user, exists: true };
 }
 
 export async function saveState(id: string, state: SessionState): Promise<void> {
   await q('UPDATE sessions SET state = $2, updated_at = now() WHERE id = $1', [id, JSON.stringify(state)]);
 }
 
-export async function deleteSession(): Promise<void> {
-  const jar = await cookies();
-  const id = jar.get(SESSION_COOKIE)?.value;
-  if (id && /^[0-9a-f-]{36}$/.test(id)) {
-    await q('DELETE FROM followups WHERE session_id = $1', [id]);
-    await q('DELETE FROM sessions WHERE id = $1', [id]);
-  }
-  jar.delete(SESSION_COOKIE);
+/** Title of a chat: the first thing the user typed (or tapped). */
+export function chatTitle(messages: UIMessage[]): string | null {
+  const first = messages.find((m) => m.role === 'user');
+  const text = first?.parts.map((p) => (p.type === 'text' ? p.text : '')).join(' ').replace(/\s+/g, ' ').trim();
+  if (!text) return null;
+  return text.length > 48 ? `${text.slice(0, 47)}…` : text;
+}
+
+export async function saveMessages(id: string, messages: UIMessage[]): Promise<void> {
+  await q('UPDATE sessions SET messages = $2, title = COALESCE(title, $3), updated_at = now() WHERE id = $1', [id, JSON.stringify(messages), chatTitle(messages)]);
+}
+
+export type ChatSummary = { id: string; title: string; updated_at: string; turns: number };
+
+export async function listChats(userId: string): Promise<ChatSummary[]> {
+  return q<ChatSummary>(
+    `SELECT id, COALESCE(title, 'گفتگوی بی‌عنوان') AS title, updated_at,
+            (SELECT count(*)::int FROM jsonb_array_elements(messages) m WHERE m->>'role' = 'user') AS turns
+       FROM sessions WHERE user_id = $1 AND jsonb_array_length(messages) > 0
+      ORDER BY updated_at DESC LIMIT 60`,
+    [userId],
+  );
+}
+
+export async function loadChat(userId: string, id: string): Promise<{ id: string; title: string | null; state: SessionState; messages: UIMessage[] } | null> {
+  if (!UUID_RE.test(id)) return null;
+  const [row] = await q<{ id: string; title: string | null; state: unknown; messages: UIMessage[] }>(
+    'SELECT id, title, state, messages FROM sessions WHERE id = $1 AND user_id = $2',
+    [id, userId],
+  );
+  return row ? { ...row, state: normalize(row.state) } : null;
+}
+
+export async function deleteChat(userId: string, id: string): Promise<boolean> {
+  if (!UUID_RE.test(id)) return false;
+  const rows = await q<{ id: string }>('DELETE FROM sessions WHERE id = $1 AND user_id = $2 RETURNING id', [id, userId]);
+  if (rows.length) await q('DELETE FROM followups WHERE session_id = $1', [id]);
+  return rows.length > 0;
+}
+
+/** Demo helper: forget everything about one user (chats, follow-ups, memory). */
+export async function wipeUser(userId: string): Promise<void> {
+  await q('DELETE FROM followups WHERE session_id IN (SELECT id FROM sessions WHERE user_id = $1)', [userId]);
+  await q('DELETE FROM sessions WHERE user_id = $1', [userId]);
+  await q("UPDATE users SET memory = '{}'::jsonb WHERE id = $1", [userId]);
 }
 
 /** Compact one-line-per-field serialization for the system prompt. */

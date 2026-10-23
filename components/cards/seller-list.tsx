@@ -165,7 +165,7 @@ export function SellerList({ output, isLatest, toolCallId }: { output: SellersOu
         </div>
       )}
 
-      <div className={cn('space-y-3 transition-opacity', loading && 'opacity-60')}>
+      <div className={cn('grid gap-3 transition-opacity @2xl:grid-cols-2', loading && 'opacity-60')}>
         {visible.map((r) => (
           <SellerCard key={r.offer_id} row={r} rank={data.rows.indexOf(r) + 1} productTitle={productTitle} availability={followups.availabilityFor(r.offer_id, state?.followups[r.offer_id])} />
         ))}

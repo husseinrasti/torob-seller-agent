@@ -354,6 +354,17 @@ export type ShopDetails = {
   website_url: string | null;
   instagram: string | null;
   other_offers: Array<{ offer_id: string; product_id: string; title: string; price: number | null; freshness: Freshness; price_age_days: number | null }>;
+  /** the chosen product's (cheapest sane) offer in this shop, when it lists it */
+  product_offer: {
+    offer_id: string;
+    product_id: string;
+    title: string;
+    price: number | null;
+    price_flag: PriceFlag;
+    freshness: Freshness;
+    price_age_days: number | null;
+    warranty_text: string | null;
+  } | null;
   nav_links: { osm: string; google: string; neshan: string };
 };
 
@@ -381,11 +392,21 @@ export async function shopDetails(shopId: string, opts: { category?: string | nu
     instagram: string | null;
   }>(`SELECT * FROM shops WHERE shop_id = $1`, [shopId]);
   if (!s) return null;
+  const [productOffer] = opts.excludeProductId
+    ? await q<NonNullable<ShopDetails['product_offer']>>(
+        `SELECT o.offer_id, o.product_id, p.persian_title AS title, o.price_toman::float8 AS price, o.price_flag, o.freshness,
+                o.price_age_days, o.warranty_text
+           FROM offers o JOIN products p USING (product_id)
+          WHERE o.shop_id = $1 AND o.product_id = $2
+          ORDER BY (o.price_flag = 'ok') DESC, o.price_toman ASC NULLS LAST LIMIT 1`,
+        [shopId, opts.excludeProductId],
+      )
+    : [];
   const others = await q<{ offer_id: string; product_id: string; persian_title: string; price: number | null; freshness: Freshness; price_age_days: number | null }>(
     `SELECT o.offer_id, o.product_id, p.persian_title, o.price_toman::float8 AS price, o.freshness, o.price_age_days
        FROM offers o JOIN products p USING (product_id)
-      WHERE o.shop_id = $1 AND ($2::text IS NULL OR p.category_name = $2) AND ($3::text IS NULL OR o.product_id <> $3)
-      ORDER BY p.seller_count DESC, o.price_toman NULLS LAST LIMIT 5`,
+      WHERE o.shop_id = $1 AND ($3::text IS NULL OR o.product_id <> $3)
+      ORDER BY (p.category_name = $2) DESC NULLS LAST, p.seller_count DESC, o.price_toman NULLS LAST LIMIT 6`,
     [shopId, opts.category ?? null, opts.excludeProductId ?? null],
   );
   const os = openState(s.weekly_hours, now);
@@ -410,6 +431,7 @@ export async function shopDetails(shopId: string, opts: { category?: string | nu
     website_url: s.website_url,
     instagram: s.instagram,
     other_offers: others.map((o) => ({ offer_id: o.offer_id, product_id: o.product_id, title: o.persian_title, price: o.price, freshness: o.freshness, price_age_days: o.price_age_days })),
+    product_offer: productOffer ?? null,
     nav_links: navLinks(s.lat, s.lon),
   };
 }

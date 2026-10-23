@@ -1,11 +1,24 @@
 'use client';
 
 import 'maplibre-gl/dist/maplibre-gl.css';
-import { Map as MLMap, Marker as MLMarker, NavigationControl, setWorkerUrl, type GeoJSONSource, type MapMouseEvent, type StyleSpecification } from 'maplibre-gl';
+import {
+  Map as MLMap,
+  Marker as MLMarker,
+  NavigationControl,
+  Popup,
+  setWorkerUrl,
+  type GeoJSONSource,
+  type MapLayerMouseEvent,
+  type MapMouseEvent,
+  type StyleSpecification,
+} from 'maplibre-gl';
 import { useEffect, useRef } from 'react';
 import { toFaDigits } from '@/lib/fa/digits';
 
 setWorkerUrl('/maplibre/maplibre-gl-worker.mjs');
+
+/** A shop drawn in the WebGL layer: `kind` sets the colour. */
+export type ShopPoint = { id: string; lat: number; lon: number; name: string; kind: 'offers' | 'maybe' | 'none' };
 
 export type MapMarker = { id: string; lat: number; lon: number; label: string; kind: 'seller' | 'maybe'; active?: boolean };
 
@@ -61,11 +74,25 @@ function sellerEl(m: MapMarker, onClick?: (id: string) => void): HTMLElement {
   return el;
 }
 
+function shopsGeoJSON(points: ShopPoint[]) {
+  return {
+    type: 'FeatureCollection' as const,
+    features: points.map((p) => ({
+      type: 'Feature' as const,
+      properties: { id: p.id, name: p.name, kind: p.kind },
+      geometry: { type: 'Point' as const, coordinates: [p.lon, p.lat] },
+    })),
+  };
+}
+
 export default function MapView({
   center,
   radiusM,
   markers = [],
   onMarkerClick,
+  shops,
+  selectedShopId,
+  onShopClick,
   pick,
   onPick,
   className,
@@ -74,6 +101,10 @@ export default function MapView({
   radiusM: number;
   markers?: MapMarker[];
   onMarkerClick?: (id: string) => void;
+  /** every shop in the area (clickable dots) */
+  shops?: ShopPoint[];
+  selectedShopId?: string | null;
+  onShopClick?: (id: string) => void;
   pick?: { lat: number; lon: number } | null;
   onPick?: (lat: number, lon: number) => void;
   className?: string;
@@ -85,6 +116,12 @@ export default function MapView({
   const markerRefs = useRef<MLMarker[]>([]);
   const onPickRef = useRef(onPick);
   onPickRef.current = onPick;
+  const onShopRef = useRef(onShopClick);
+  onShopRef.current = onShopClick;
+  // layers are added on 'style.load' (no waiting for tiles); later updates queue until then
+  const ready = useRef(false);
+  const queue = useRef<Array<() => void>>([]);
+  const whenReady = (fn: () => void) => (ready.current ? fn() : queue.current.push(fn));
 
   useEffect(() => {
     if (!box.current) return;
@@ -96,10 +133,46 @@ export default function MapView({
       attributionControl: { compact: true },
     });
     m.addControl(new NavigationControl({ showCompass: false }), 'top-left');
-    m.on('load', () => {
+    m.once('style.load', () => {
       m.addSource('radius', { type: 'geojson', data: circle(center.lat, center.lon, radiusM) });
       m.addLayer({ id: 'radius-fill', type: 'fill', source: 'radius', paint: { 'fill-color': '#0f766e', 'fill-opacity': 0.08 } });
       m.addLayer({ id: 'radius-line', type: 'line', source: 'radius', paint: { 'line-color': '#0f766e', 'line-width': 2, 'line-dasharray': [2, 2] } });
+      m.addSource('shops', { type: 'geojson', data: shopsGeoJSON([]) });
+      m.addLayer({
+        id: 'shops-dot',
+        type: 'circle',
+        source: 'shops',
+        paint: {
+          'circle-radius': ['interpolate', ['linear'], ['zoom'], 13, 2.5, 16, 5, 18, 8],
+          'circle-color': ['match', ['get', 'kind'], 'maybe', '#d97706', 'offers', '#0f766e', '#94a3b8'],
+          'circle-opacity': ['match', ['get', 'kind'], 'none', 0.55, 0.8],
+          'circle-stroke-color': '#ffffff',
+          'circle-stroke-width': 1,
+        },
+      });
+      m.addLayer({
+        id: 'shops-selected',
+        type: 'circle',
+        source: 'shops',
+        filter: ['==', ['get', 'id'], ''],
+        paint: { 'circle-radius': 11, 'circle-color': '#b45309', 'circle-opacity': 0.35, 'circle-stroke-color': '#b45309', 'circle-stroke-width': 2 },
+      });
+      ready.current = true;
+      queue.current.splice(0).forEach((f) => f());
+    });
+    const hover = new Popup({ closeButton: false, closeOnClick: false, offset: 8, className: 'hk-popup' });
+    m.on('mouseenter', 'shops-dot', (e: MapLayerMouseEvent) => {
+      m.getCanvas().style.cursor = 'pointer';
+      const f = e.features?.[0];
+      if (f) hover.setLngLat(e.lngLat).setText(String(f.properties?.name ?? '')).addTo(m);
+    });
+    m.on('mouseleave', 'shops-dot', () => {
+      m.getCanvas().style.cursor = '';
+      hover.remove();
+    });
+    m.on('click', 'shops-dot', (e: MapLayerMouseEvent) => {
+      const id = e.features?.[0]?.properties?.id;
+      if (id) onShopRef.current?.(String(id));
     });
     m.on('click', (e: MapMouseEvent) => onPickRef.current?.(e.lngLat.lat, e.lngLat.lng));
     userPin.current = new MLMarker({ element: pinEl('user') }).setLngLat([center.lon, center.lat]).addTo(m);
@@ -107,6 +180,8 @@ export default function MapView({
     return () => {
       m.remove();
       map.current = null;
+      ready.current = false;
+      queue.current = [];
     };
     // the map is created once; later prop changes are applied by the effects below
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -128,8 +203,7 @@ export default function MapView({
         { padding: 24, duration: 400, maxZoom: 17 },
       );
     };
-    if (m.isStyleLoaded()) apply();
-    else m.once('load', apply);
+    whenReady(apply);
   }, [center.lat, center.lon, radiusM]);
 
   useEffect(() => {
@@ -138,6 +212,18 @@ export default function MapView({
     markerRefs.current.forEach((mk) => mk.remove());
     markerRefs.current = markers.map((mk) => new MLMarker({ element: sellerEl(mk, onMarkerClick) }).setLngLat([mk.lon, mk.lat]).addTo(m));
   }, [markers, onMarkerClick]);
+
+  useEffect(() => {
+    const m = map.current;
+    if (!m || !shops) return;
+    whenReady(() => (m.getSource('shops') as GeoJSONSource | undefined)?.setData(shopsGeoJSON(shops)));
+  }, [shops]);
+
+  useEffect(() => {
+    const m = map.current;
+    if (!m) return;
+    whenReady(() => m.setFilter('shops-selected', ['==', ['get', 'id'], selectedShopId ?? '']));
+  }, [selectedShopId]);
 
   useEffect(() => {
     const m = map.current;

@@ -1,6 +1,6 @@
 'use client';
 
-import { Map as MapIcon, Moon, RotateCcw, ShoppingBag, Sun } from 'lucide-react';
+import { Map as MapIcon, Menu, Moon, Plus, ShoppingBag, Sun } from 'lucide-react';
 import { useTheme } from 'next-themes';
 import { Button } from '@/components/ui/button';
 import { cn } from '@/lib/utils';
@@ -17,13 +17,28 @@ function demoLabel(demoTime: string | undefined): string | null {
   return `${FA_DAY[DAY_KEYS[dayIdx]]} ${toFaDigits(`${String(Math.floor(minutes / 60)).padStart(2, '0')}:${String(minutes % 60).padStart(2, '0')}`)}`;
 }
 
-export function Header({ mapOpen, onToggleMap, onNewChat, hasMessages }: { mapOpen: boolean; onToggleMap: () => void; onNewChat: () => void; hasMessages: boolean }) {
+export function Header({
+  mapOpen,
+  onToggleMap,
+  onNewChat,
+  onOpenHistory,
+  hasMessages,
+}: {
+  mapOpen: boolean;
+  onToggleMap: () => void;
+  onNewChat: () => void;
+  onOpenHistory: () => void;
+  hasMessages: boolean;
+}) {
   const { state, llm } = useSession();
   const { resolvedTheme, setTheme } = useTheme();
   const demo = demoLabel(state?.demoTime);
   return (
-    <div className="flex h-14 items-center justify-between gap-2 px-4">
+    <div className="mx-auto flex h-14 w-full max-w-3xl items-center justify-between gap-2 px-4">
       <div className="flex min-w-0 items-center gap-2">
+        <Button variant="ghost" size="icon" className="-ms-2 size-11 lg:hidden" onClick={onOpenHistory} aria-label="گفتگوهای قبلی">
+          <Menu className="size-5" />
+        </Button>
         <span className="flex size-9 items-center justify-center rounded-xl bg-primary text-primary-foreground">
           <ShoppingBag className="size-5" />
         </span>
@@ -51,11 +66,11 @@ export function Header({ mapOpen, onToggleMap, onNewChat, hasMessages }: { mapOp
           <Moon className="size-4 dark:hidden" />
         </Button>
         {hasMessages && (
-          <Button variant="ghost" size="icon" className="size-11" onClick={onNewChat} aria-label="گفتگوی تازه">
-            <RotateCcw className="size-4" />
+          <Button variant="ghost" size="icon" className="size-11 lg:hidden" onClick={onNewChat} aria-label="گفتگوی تازه">
+            <Plus className="size-5" />
           </Button>
         )}
-        <Button variant={mapOpen ? 'default' : 'outline'} size="sm" className={cn('h-11 gap-1.5')} onClick={onToggleMap} aria-pressed={mapOpen}>
+        <Button variant={mapOpen ? 'default' : 'outline'} size="sm" className={cn('h-11 gap-1.5 lg:hidden')} onClick={onToggleMap} aria-pressed={mapOpen}>
           <MapIcon className="size-4" />
           نقشه
         </Button>

@@ -1,12 +1,16 @@
 import {
   convertToModelMessages,
+  createIdGenerator,
   createUIMessageStream,
   createUIMessageStreamResponse,
   stepCountIs,
   streamText,
   type UIMessage,
 } from 'ai';
-import { getOrCreateSession, saveState, type SessionState } from '@/lib/agent/state';
+import { chatSession, saveMessages, saveState, type Session, type SessionState } from '@/lib/agent/state';
+import { memoryForPrompt, rememberTurn } from '@/lib/agent/memory';
+import { saveMemory } from '@/lib/auth';
+import { errorResponse } from '@/lib/http';
 import { ACTION_TOOLS, buildTools, runTool, type ToolCtx } from '@/lib/agent/tools';
 import { systemPrompt } from '@/lib/agent/system-prompt';
 import { appNow } from '@/lib/data/hours';
@@ -34,16 +38,43 @@ async function persist(sessionId: string, before: string, state: SessionState) {
   for (const key of Object.keys(state) as Array<keyof SessionState>) {
     if (JSON.stringify(state[key]) !== JSON.stringify(prev[key])) latest[key] = state[key];
   }
+  // follow-up replies may resolve (via polling) while this turn is still streaming: a resolved status wins
+  const stored = (rows[0]?.state?.followups ?? {}) as SessionState['followups'];
+  const pendingish = (v?: string) => v === 'pending' || v === 'contacting';
+  latest.followups = { ...(latest.followups as SessionState['followups']) };
+  for (const [offer, st] of Object.entries(stored)) {
+    const mine = (latest.followups as SessionState['followups'])[offer];
+    if (!pendingish(st) && pendingish(mine)) (latest.followups as SessionState['followups'])[offer] = st;
+  }
   for (const key of Object.keys(prev) as Array<keyof SessionState>) if (!(key in state)) delete latest[key];
   await saveState(sessionId, latest as SessionState);
 }
 
+const genId = createIdGenerator({ prefix: 'msg', size: 16 });
+
+const titleOf = async (productId?: string) =>
+  productId ? (await q<{ persian_title: string }>('SELECT persian_title FROM products WHERE product_id = $1', [productId]))[0]?.persian_title : undefined;
+
+/** Remember searches, chosen products and the chosen location across chats. */
+async function updateMemory(session: Session, before: string, state: SessionState) {
+  const prev = JSON.parse(before) as SessionState;
+  const productTitle = state.chosenProduct !== prev.chosenProduct ? await titleOf(state.chosenProduct) : undefined;
+  const next = rememberTurn(session.user.memory, prev, state, { productTitle });
+  if (next) await saveMemory(session.user.id, next);
+}
+
 export async function POST(req: Request) {
-  const body = (await req.json().catch(() => null)) as { messages?: UIMessage[] } | null;
-  const messages = (body?.messages ?? []).slice(-MAX_HISTORY);
+  const body = (await req.json().catch(() => null)) as { id?: string; messages?: UIMessage[] } | null;
+  const all = body?.messages ?? [];
+  const messages = all.slice(-MAX_HISTORY);
   if (!messages.length) return new Response('messages required', { status: 400 });
 
-  const session = await getOrCreateSession();
+  let session: Session;
+  try {
+    session = await chatSession(body?.id);
+  } catch (err) {
+    return errorResponse(err);
+  }
   const before = JSON.stringify(session.state);
   const ctx: ToolCtx = { sessionId: session.id, state: session.state, now: appNow(session.state.demoTime) };
   const tools = buildTools(ctx);
@@ -52,13 +83,14 @@ export async function POST(req: Request) {
   const action = meta.action && ACTION_TOOLS.has(meta.action.tool) ? meta.action : undefined;
 
   const stream = createUIMessageStream({
-    originalMessages: messages,
+    originalMessages: all,
+    generateId: genId,
     execute: async ({ writer }) => {
       const extra: UIMessage[] = [];
       if (action) {
         // UI action: run the tool right away so cards appear without waiting for the LLM
         const toolCallId = `act_${Date.now().toString(36)}`;
-        writer.write({ type: 'start' });
+        writer.write({ type: 'start', messageId: genId() });
         writer.write({ type: 'start-step' });
         writer.write({ type: 'tool-input-available', toolCallId, toolName: action.tool, input: action.input });
         try {
@@ -82,11 +114,9 @@ export async function POST(req: Request) {
         await persist(session.id, before, ctx.state).catch(() => {});
       }
 
-      const productTitle = ctx.state.chosenProduct
-        ? (await q<{ persian_title: string }>('SELECT persian_title FROM products WHERE product_id = $1', [ctx.state.chosenProduct]))[0]?.persian_title
-        : undefined;
+      const productTitle = await titleOf(ctx.state.chosenProduct);
       const system =
-        systemPrompt(ctx.state, ctx.now, { productTitle }) +
+        systemPrompt(ctx.state, ctx.now, { productTitle, memory: memoryForPrompt(session.user.name, session.user.memory) }) +
         (action ? `\n\nکاربر با لمس دکمه، ابزار ${action.tool} را اجرا کرد و نتیجه‌اش نمایش داده شد. همان ابزار را دوباره صدا نزن؛ فقط در ۱ تا ۲ جمله نتیجه را جمع‌بندی کن و قدم بعدی را پیشنهاد بده.` : '');
 
       let noticed = false;
@@ -104,11 +134,13 @@ export async function POST(req: Request) {
         timeout: { stepMs: 25_000 },
         maxRetries: 1,
       });
-      writer.merge(result.toUIMessageStream({ sendStart: !action, onError: persianError }));
+      writer.merge(result.toUIMessageStream({ sendStart: !action, generateMessageId: genId, onError: persianError }));
     },
     onError: persianError,
-    onEnd: async () => {
+    onEnd: async ({ messages: finalMessages }) => {
       await persist(session.id, before, ctx.state).catch((e) => console.error('[api/chat] persist', e));
+      await saveMessages(session.id, finalMessages).catch((e) => console.error('[api/chat] save messages', e));
+      await updateMemory(session, before, ctx.state).catch((e) => console.error('[api/chat] memory', e));
     },
   });
 

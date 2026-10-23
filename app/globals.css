@@ -139,3 +139,13 @@
   position: absolute;
   inset: -6px -2px;
 }
+
+/* MapLibre hover popup in the app font */
+.hk-popup .maplibregl-popup-content {
+  font-family: var(--font-vazirmatn), sans-serif;
+  font-size: 12px;
+  padding: 4px 8px;
+  direction: rtl;
+  border-radius: 8px;
+  color: #0f172a;
+}

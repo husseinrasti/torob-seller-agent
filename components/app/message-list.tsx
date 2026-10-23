@@ -172,7 +172,7 @@ export function MessageList({ messages }: { messages: UIMessage[] }) {
         m.role === 'user' ? (
           <UserMessage key={m.id} message={m} />
         ) : (
-          <div key={m.id} id={`msg-${m.id}`} className="scroll-mt-36">
+          <div key={m.id} id={`msg-${m.id}`} className="scroll-mt-4">
             <AssistantMessage message={m} latestSellersId={latestSellersId} isLastMessage={idx === messages.length - 1} />
           </div>
         ),

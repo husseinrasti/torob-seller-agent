@@ -121,12 +121,32 @@ export const categories = pgTable(
   (t) => [index('categories_name_trgm_idx').using('gin', t.name_norm.op('gin_trgm_ops'))],
 );
 
-export const sessions = pgTable('sessions', {
+/** Name-only accounts (no password) so chats and memory can be kept per person. */
+export const users = pgTable('users', {
   id: uuid('id').primaryKey().defaultRandom(),
-  state: jsonb('state').notNull().default({}),
-  createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
-  updatedAt: timestamp('updated_at', { withTimezone: true }).notNull().defaultNow(),
+  name: text('name').notNull(),
+  /** normalized name used for login matching */
+  name_key: text('name_key').notNull().unique(),
+  /** cross-chat memory: usual location, recent searches/products (see lib/agent/memory.ts) */
+  memory: jsonb('memory').notNull().default({}),
+  created_at: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
+  last_seen_at: timestamp('last_seen_at', { withTimezone: true }).notNull().defaultNow(),
 });
+
+/** One row per chat: its agent state, its UI messages and its owner. */
+export const sessions = pgTable(
+  'sessions',
+  {
+    id: uuid('id').primaryKey().defaultRandom(),
+    user_id: uuid('user_id').references(() => users.id, { onDelete: 'cascade' }),
+    title: text('title'),
+    state: jsonb('state').notNull().default({}),
+    messages: jsonb('messages').notNull().default([]),
+    createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
+    updatedAt: timestamp('updated_at', { withTimezone: true }).notNull().defaultNow(),
+  },
+  (t) => [index('sessions_user_updated_idx').on(t.user_id, t.updatedAt)],
+);
 
 export const followups = pgTable(
   'followups',

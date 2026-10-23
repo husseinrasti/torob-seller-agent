@@ -40,7 +40,7 @@ export function ContextBar() {
 
   return (
     <>
-      <div className="no-scrollbar flex items-center gap-1.5 overflow-x-auto px-4 py-2">
+      <div className="no-scrollbar flex items-center gap-1.5 overflow-x-auto px-4 py-2 lg:flex-wrap lg:overflow-visible">
         <Chip id="location" onClick={() => setOpen('location')} label="تغییر محل">
           <MapPin className="size-3.5 text-primary" />
           <span className="max-w-28 truncate">{state.location.label}</span>

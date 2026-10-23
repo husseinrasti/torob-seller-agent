@@ -1,7 +1,11 @@
 'use client';
 
-import { useEffect, useState } from 'react';
-import { Clock, CreditCard, ExternalLink, Map, Truck } from 'lucide-react';
+import { useContext, useEffect, useState } from 'react';
+import { Clock, CreditCard, ExternalLink, ListPlus, Map, Phone, ShoppingBag, Truck } from 'lucide-react';
+import { Button } from '@/components/ui/button';
+import { useIsDesktop } from '@/lib/client';
+import { ChatActionsContext } from '@/components/app/chat-actions';
+import { useFollowups } from '@/components/app/followups-store';
 import { Sheet, SheetContent, SheetDescription, SheetHeader, SheetTitle } from '@/components/ui/sheet';
 import { Skeleton } from '@/components/ui/skeleton';
 import { faText, formatToman } from '@/lib/fa/format';
@@ -9,7 +13,7 @@ import { toFaDigits } from '@/lib/fa/digits';
 import type { ShopDetails } from '@/lib/search/sellers';
 import type { Breakdown } from '@/lib/search/score';
 import { useSession } from '@/components/app/session-context';
-import { FreshnessBadge, MallChip, OpenDot } from './badges';
+import { AvailabilityBadge, FreshnessBadge, MallChip, OpenDot, PriceLine } from './badges';
 
 const FACTORS: Array<[keyof Breakdown, string]> = [
   ['price', 'قیمت'],
@@ -32,9 +36,17 @@ export function ShopDetailsSheet({
   productId?: string;
   score?: Breakdown;
 }) {
-  const { state } = useSession();
+  const { state, patch } = useSession();
+  const chat = useContext(ChatActionsContext);
+  const { availabilityFor } = useFollowups();
+  const desktop = useIsDesktop();
   const [data, setData] = useState<ShopDetails | null>(null);
   const [error, setError] = useState(false);
+
+  useEffect(() => {
+    setData(null);
+    setError(false);
+  }, [shopId, productId]);
 
   useEffect(() => {
     if (!open || data) return;
@@ -49,7 +61,10 @@ export function ShopDetailsSheet({
 
   return (
     <Sheet open={open} onOpenChange={onOpenChange}>
-      <SheetContent side="bottom" className="mx-auto max-h-[85dvh] max-w-[520px] overflow-y-auto rounded-t-3xl">
+      <SheetContent
+        side={desktop ? 'left' : 'bottom'}
+        className={desktop ? 'w-[26rem] max-w-[90vw] overflow-y-auto sm:max-w-[26rem]' : 'mx-auto max-h-[85dvh] max-w-[520px] overflow-y-auto rounded-t-3xl'}
+      >
         <SheetHeader>
           <SheetTitle>{data?.shop_name ?? 'جزئیات فروشگاه'}</SheetTitle>
           <SheetDescription>نشانی دقیق، ساعت کاری امروز و شرایط خرید</SheetDescription>
@@ -69,6 +84,59 @@ export function ShopDetailsSheet({
                 <MallChip mall={data.mall} />
                 <p className="leading-6 text-muted-foreground">{data.address ? toFaDigits(data.address) : 'نشانی ثبت نشده'}</p>
               </section>
+              {data.product_offer ? (
+                <section className="space-y-2 rounded-2xl border border-primary/30 bg-accent/40 p-3">
+                  <p className="flex items-center gap-1.5 text-xs font-semibold text-primary">
+                    <ShoppingBag className="size-4" />
+                    کالای انتخابی شما را ثبت کرده است
+                  </p>
+                  <p className="line-clamp-2 text-xs">{faText(data.product_offer.title)}</p>
+                  <dl className="grid grid-cols-[auto_1fr] items-center gap-x-3 gap-y-1 text-xs">
+                    <dt className="text-muted-foreground">قیمت ثبت‌شده</dt>
+                    <dd>
+                      <PriceLine price={data.product_offer.price} flag={data.product_offer.price_flag} />
+                    </dd>
+                    <dt className="text-muted-foreground">آخرین تغییر قیمت</dt>
+                    <dd>
+                      <FreshnessBadge freshness={data.product_offer.freshness} days={data.product_offer.price_age_days} />
+                    </dd>
+                    <dt className="text-muted-foreground">موجودی</dt>
+                    <dd>
+                      <AvailabilityBadge a={availabilityFor(data.product_offer.offer_id, state?.followups[data.product_offer.offer_id])} />
+                    </dd>
+                  </dl>
+                  {chat && state && (
+                    <div className="grid grid-cols-2 gap-2 pt-1">
+                      <Button
+                        size="sm"
+                        className="h-11"
+                        disabled={chat.busy}
+                        onClick={() => {
+                          chat.sendAction(`موجودی «${data.shop_name}» را پیگیری کن`, 'contact_seller', { offer_ids: [data.product_offer!.offer_id], channel: 'message' });
+                          onOpenChange(false);
+                        }}
+                      >
+                        <Phone className="size-4" />
+                        پیگیری
+                      </Button>
+                      <Button
+                        size="sm"
+                        variant={state.shortlist.includes(data.product_offer.offer_id) ? 'secondary' : 'outline'}
+                        className="h-11"
+                        onClick={() => {
+                          const id = data.product_offer!.offer_id;
+                          patch({ shortlist: state.shortlist.includes(id) ? state.shortlist.filter((o) => o !== id) : [...state.shortlist, id] });
+                        }}
+                      >
+                        <ListPlus className="size-4" />
+                        {state.shortlist.includes(data.product_offer.offer_id) ? 'در برنامه' : 'به برنامه'}
+                      </Button>
+                    </div>
+                  )}
+                </section>
+              ) : productId ? (
+                <p className="rounded-xl bg-muted px-3 py-2 text-xs leading-5 text-muted-foreground">این فروشگاه کالای انتخابی شما را ثبت نکرده است؛ قیمت و موجودی آن مشخص نیست.</p>
+              ) : null}
               <section className="flex items-start gap-2">
                 <Clock className="mt-0.5 size-4 text-muted-foreground" />
                 <div className="space-y-1">
@@ -112,7 +180,7 @@ export function ShopDetailsSheet({
               )}
               {data.other_offers.length > 0 && (
                 <section>
-                  <h5 className="mb-1.5 text-xs font-semibold">کالاهای دیگر همین دسته در این فروشگاه</h5>
+                  <h5 className="mb-1.5 text-xs font-semibold">کالاهای این فروشگاه</h5>
                   <ul className="divide-y rounded-xl border">
                     {data.other_offers.map((o) => (
                       <li key={o.offer_id} className="space-y-1 p-2">

@@ -15,7 +15,7 @@ function ProductCard({ p, selected, onToggle, canSelect }: { p: ProductHit; sele
   const { sendAction, busy } = useChatActions();
   const shortTitle = p.title.split('|')[0].trim();
   return (
-    <article className={cn('flex w-[17rem] shrink-0 snap-start flex-col overflow-hidden rounded-2xl border bg-card shadow-xs transition', selected && 'ring-2 ring-primary')}>
+    <article className={cn('flex w-[17rem] shrink-0 snap-start flex-col overflow-hidden rounded-2xl border bg-card shadow-xs transition @2xl:w-auto', selected && 'ring-2 ring-primary')}>
       <div className="flex gap-3 p-3">
         <ProductImage src={p.image} alt={p.title} className="size-20 shrink-0" />
         <div className="min-w-0 flex-1">
@@ -97,7 +97,7 @@ export function ProductCards({ output }: { output: ProductsOutput }) {
           بودجه: تا {formatTomanShort(output.budget.max)} تومان{output.budget_relaxed ? ' (گزینه کافی در بودجه نبود؛ نزدیک‌ترین‌ها آمده)' : ''}
         </p>
       ) : null}
-      <div className="no-scrollbar -mx-4 flex snap-x snap-mandatory gap-3 overflow-x-auto px-4 pb-1">
+      <div className="no-scrollbar -mx-4 flex snap-x snap-mandatory gap-3 overflow-x-auto px-4 pb-1 @2xl:mx-0 @2xl:grid @2xl:grid-cols-2 @2xl:overflow-visible @2xl:px-0">
         {output.products.map((p) => (
           <ProductCard key={p.product_id} p={p} selected={selected.includes(p.product_id)} canSelect={selected.length < 4} onToggle={() => toggle(p.product_id)} />
         ))}

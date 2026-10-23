@@ -147,9 +147,11 @@ export async function startFollowups(opts: {
 }
 
 /** Current state of follow-ups; rows whose due time passed are resolved now (idempotent). */
-export async function getFollowups(ids: string[]): Promise<FollowupItem[]> {
+export async function getFollowups(ids: string[], sessionId?: string): Promise<FollowupItem[]> {
   if (!ids.length) return [];
-  const rows = await q<Row>(`SELECT * FROM followups WHERE id = ANY($1::uuid[])`, [ids]);
+  const rows = sessionId
+    ? await q<Row>(`SELECT * FROM followups WHERE id = ANY($1::uuid[]) AND session_id = $2`, [ids, sessionId])
+    : await q<Row>(`SELECT * FROM followups WHERE id = ANY($1::uuid[])`, [ids]);
   const now = Date.now();
   const out: FollowupItem[] = [];
   for (const r of rows) {

@@ -7,6 +7,10 @@ import type { Suggestion } from '@/lib/agent/suggest';
 import type { SellersResult } from '@/lib/search/sellers';
 
 type SessionCtx = {
+  /** the chat these values belong to (sent as x-chat-id) */
+  chatId: string;
+  /** fetch with this chat's id header */
+  api: (path: string, init?: RequestInit) => Promise<Response>;
   state: SessionState | null;
   suggestions: Suggestion[];
   llm: 'live' | 'offline' | null;
@@ -41,7 +45,7 @@ function optimistic(state: SessionState, p: StatePatch): SessionState {
   return next;
 }
 
-export function SessionProvider({ demoTime, children }: { demoTime: string | null; children: React.ReactNode }) {
+export function SessionProvider({ chatId, demoTime, children }: { chatId: string; demoTime: string | null; children: React.ReactNode }) {
   const [state, setState] = useState<SessionState | null>(null);
   const [suggestions, setSuggestions] = useState<Suggestion[]>([]);
   const [llm, setLlm] = useState<'live' | 'offline' | null>(null);
@@ -49,20 +53,25 @@ export function SessionProvider({ demoTime, children }: { demoTime: string | nul
   const [focusShop, setFocusShop] = useState<string | null>(null);
   const seq = useRef(0);
 
+  const api = useCallback(
+    (path: string, init: RequestInit = {}) => fetch(path, { cache: 'no-store', ...init, headers: { ...(init.headers ?? {}), 'x-chat-id': chatId } }),
+    [chatId],
+  );
+
   const refresh = useCallback(async () => {
-    const res = await fetch('/api/session', { cache: 'no-store' });
+    const res = await api('/api/session');
     if (!res.ok) return;
     const data = await res.json();
     setState(data.state);
     setSuggestions(data.suggestions ?? []);
     if (data.llm) setLlm(data.llm);
-  }, []);
+  }, [api]);
 
   const patch = useCallback(async (p: StatePatch) => {
     const my = ++seq.current;
     setState((s) => (s ? optimistic(s, p) : s));
     try {
-      const res = await fetch('/api/session', { method: 'PATCH', headers: { 'content-type': 'application/json' }, body: JSON.stringify(p) });
+      const res = await api('/api/session', { method: 'PATCH', headers: { 'content-type': 'application/json' }, body: JSON.stringify(p) });
       if (!res.ok) throw new Error(String(res.status));
       const data = await res.json();
       if (my === seq.current) {
@@ -73,23 +82,29 @@ export function SessionProvider({ demoTime, children }: { demoTime: string | nul
       toast.error('ذخیره تنظیمات ناموفق بود؛ دوباره امتحان کنید.');
       refresh();
     }
-  }, [refresh]);
+  }, [refresh, api]);
 
   useEffect(() => {
     (async () => {
-      await refresh();
-      // demo clock from ?demo_time= (or back to the real clock)
-      await fetch('/api/session', {
-        method: 'PATCH',
-        headers: { 'content-type': 'application/json' },
-        body: JSON.stringify({ demoTime: demoTime ?? null }),
-      }).then((r) => r.json()).then((d) => d?.state && setState(d.state)).catch(() => {});
+      const res = await api('/api/session');
+      if (!res.ok) return;
+      const data = await res.json();
+      setState(data.state);
+      setSuggestions(data.suggestions ?? []);
+      if (data.llm) setLlm(data.llm);
+      // demo clock from ?demo_time= (or back to the real clock) — only written when it differs
+      if ((data.state?.demoTime ?? null) !== (demoTime ?? null)) {
+        await api('/api/session', { method: 'PATCH', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ demoTime: demoTime ?? null }) })
+          .then((r) => r.json())
+          .then((d) => d?.state && setState(d.state))
+          .catch(() => {});
+      }
     })();
-  }, [demoTime, refresh]);
+  }, [demoTime, api]);
 
   const value = useMemo(
-    () => ({ state, suggestions, llm, patch, refresh, latestSellers, setLatestSellers, focusShop, setFocusShop }),
-    [state, suggestions, llm, patch, refresh, latestSellers, focusShop],
+    () => ({ chatId, api, state, suggestions, llm, patch, refresh, latestSellers, setLatestSellers, focusShop, setFocusShop }),
+    [chatId, api, state, suggestions, llm, patch, refresh, latestSellers, focusShop],
   );
   return <Ctx.Provider value={value}>{children}</Ctx.Provider>;
 }

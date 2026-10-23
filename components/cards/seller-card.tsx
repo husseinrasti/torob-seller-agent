@@ -32,7 +32,7 @@ export function SellerCard({ row, rank, availability, productTitle }: { row: Sel
   return (
     <article
       id={`shop-${row.shop_id}`}
-      className={cn('scroll-mt-40 rounded-2xl border bg-card p-3 shadow-xs transition', focusShop === row.shop_id && 'ring-2 ring-primary')}
+      className={cn('scroll-mt-4 rounded-2xl border bg-card p-3 shadow-xs transition', focusShop === row.shop_id && 'ring-2 ring-primary')}
     >
       <header className="flex items-start justify-between gap-2">
         <div className="flex min-w-0 items-center gap-2">
