@@ -1,6 +1,6 @@
 'use client';
 
-import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
 import { useChat } from '@ai-sdk/react';
 import { DefaultChatTransport, type UIMessage } from 'ai';
 import { AlertTriangle, Loader2 } from 'lucide-react';
@@ -94,17 +94,40 @@ function Workspace({ chatId, initialMessages, me, chats, onNewChat, onOpenChat, 
     }
   }, [messages.length, onChatSaved]);
 
-  // bring each new message into view (start of the assistant reply, not the bottom of long lists)
+  // stick to the bottom: on open, on every new message and whenever content grows (streaming text, cards
+  // that finish loading, follow-up results, maps) — unless the user scrolled up to read; back near the
+  // bottom, following resumes
+  const pinned = useRef(true);
+  const toBottom = useCallback((smooth = false) => {
+    const el = scroller.current;
+    if (el) el.scrollTo({ top: el.scrollHeight, behavior: smooth ? 'smooth' : 'auto' });
+  }, []);
+  useLayoutEffect(() => {
+    toBottom();
+  }, [toBottom]);
+  useEffect(() => {
+    const el = scroller.current;
+    const content = el?.firstElementChild;
+    if (!el || !content) return;
+    const onScroll = () => {
+      pinned.current = el.scrollHeight - el.scrollTop - el.clientHeight < 120;
+    };
+    const ro = new ResizeObserver(() => {
+      if (pinned.current) toBottom();
+    });
+    el.addEventListener('scroll', onScroll, { passive: true });
+    ro.observe(content);
+    return () => {
+      el.removeEventListener('scroll', onScroll);
+      ro.disconnect();
+    };
+  }, [toBottom]);
   useEffect(() => {
     if (messages.length === lastCount.current) return;
     lastCount.current = messages.length;
-    const last = messages[messages.length - 1];
-    if (!last) return;
-    requestAnimationFrame(() => {
-      if (last.role === 'user') scroller.current?.scrollTo({ top: scroller.current.scrollHeight, behavior: 'smooth' });
-      else document.getElementById(`msg-${last.id}`)?.scrollIntoView({ behavior: 'smooth', block: 'start' });
-    });
-  }, [messages]);
+    pinned.current = true;
+    requestAnimationFrame(() => toBottom(true));
+  }, [messages, toBottom]);
 
   // cards updated after a reply (re-filtered lists, follow-up results) are saved so a resumed chat shows them
   useEffect(() => {
