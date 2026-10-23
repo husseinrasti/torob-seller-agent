@@ -27,12 +27,16 @@ import { HistoryPanel } from './history-panel';
 
 type Me = { user: { id: string; name: string }; memory: UserMemory };
 
-/** Suggestions of the most recent tool output that has any (text-only replies keep the previous chips). */
+/**
+ * Suggestions of the most recent tool output that has any. Text-only replies and informational cards
+ * without a `suggested_actions` field (spec answers, «کی برم؟», rank explanations, bargaining) keep the
+ * previous chips; the look-back counts only replies whose tools state their suggestions.
+ */
 function lastToolSuggestions(messages: UIMessage[]): Suggestion[] | null {
   for (let m = messages.length - 1, seen = 0; m >= 0 && seen < 4; m--) {
     const msg = messages[m];
     if (msg.role !== 'assistant') continue;
-    seen++;
+    if (msg.parts.some((p) => p.type.startsWith('tool-') && (p as { output?: object }).output && 'suggested_actions' in ((p as { output?: object }).output ?? {}))) seen++;
     for (let i = msg.parts.length - 1; i >= 0; i--) {
       const p = msg.parts[i] as { type: string; state?: string; output?: { suggested_actions?: Suggestion[] } };
       if (!p.type.startsWith('tool-') || p.state !== 'output-available') continue;

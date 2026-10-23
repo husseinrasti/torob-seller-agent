@@ -19,6 +19,7 @@ import { buildPlan } from '../plan/service';
 import { visitTime, type VisitTimeOutput } from '../search/visit-time';
 import { specProductIds, specQa, type SpecAnswerOutput } from './spec-qa';
 import { sellerMessage, type SellerMessageOutput } from '../sim/seller-message';
+import { bargainingCard, type BargainOutput } from '../search/market';
 import { WEEK, visitSentence } from '../data/hours-stats';
 import { atLocalTime, FA_DAY } from '../data/hours';
 import { extractMission } from './mission/extract';
@@ -478,6 +479,14 @@ export const TOOL_DEFS = {
     }),
     run: async (i): Promise<SellerMessageOutput> => sellerMessage(i),
     toModel: (o) => ({ shop: o.shop_name, intent: o.intent, text: o.text, channels: o.channels.map((c) => c.type), note: o.disclaimer }),
+  }),
+
+  bargaining_card: def({
+    description:
+      'Before walking in: where an offer\'s listed price sits in the market (min/median/max over sane prices), the nearest cheaper seller in the current radius, warranty and freshness notes, ≤ 4 talking points and a fair target price (only when the offer is above it). Use for «چانه بزنم؟», «قیمتش منصفانه است؟», «چقدر تخفیف بگیرم؟».',
+    input: z.object({ offer_id: z.string() }),
+    run: async (i, ctx): Promise<BargainOutput> => bargainingCard({ offer_id: i.offer_id, state: ctx.state, now: ctx.now }),
+    toModel: (o) => ({ shop: o.shop_name, price: o.price, median: o.stats.median, sellers: o.stats.n, position: o.position, delta_pct: o.delta_pct, cheaper_nearby: o.cheaper_nearby, target_price: o.target_price, fair: o.fair, talking_points: o.talking_points }),
   }),
 
   purchase_checklist: def({

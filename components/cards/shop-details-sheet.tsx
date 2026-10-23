@@ -16,6 +16,8 @@ import { useSession } from '@/components/app/session-context';
 import { AvailabilityBadge, FreshnessBadge, MallChip, OpenDot, PriceLine } from './badges';
 import { ShopTypeBadge } from '@/components/map/shop-type-icon';
 import { ShopFacts, TrustDots, TrustLinks } from './trust';
+import { BargainCard } from './bargain';
+import type { BargainOutput } from '@/lib/search/market';
 import { shopTypeLabel } from '@/lib/data/shop-types';
 
 const FACTORS = Object.entries(FACTOR_LABEL) as Array<[keyof Weights, string]>;
@@ -33,12 +35,13 @@ export function ShopDetailsSheet({
   productId?: string;
   score?: Breakdown;
 }) {
-  const { state, patch } = useSession();
+  const { state, patch, api } = useSession();
   const chat = useContext(ChatActionsContext);
   const { availabilityFor } = useFollowups();
   const desktop = useIsDesktop();
   const [data, setData] = useState<ShopDetails | null>(null);
   const [error, setError] = useState(false);
+  const [bargain, setBargain] = useState<BargainOutput | null>(null);
 
   useEffect(() => {
     setData(null);
@@ -55,6 +58,17 @@ export function ShopDetailsSheet({
       .then(setData)
       .catch(() => setError(true));
   }, [open, data, shopId, productId, state?.demoTime]);
+
+  // F5: bargaining card for the chosen product's offer in this shop (no LLM)
+  const offerId = data?.product_offer?.price ? data.product_offer.offer_id : null;
+  useEffect(() => {
+    setBargain(null);
+    if (!open || !offerId) return;
+    api(`/api/bargain?offer_id=${offerId}`)
+      .then((r) => (r.ok ? r.json() : null))
+      .then((d) => d?.ui === 'bargain' && setBargain(d))
+      .catch(() => {});
+  }, [open, offerId, api]);
 
   return (
     <Sheet open={open} onOpenChange={onOpenChange}>
@@ -131,6 +145,11 @@ export function ShopDetailsSheet({
                         <ListPlus className="size-4" />
                         {state.shortlist.includes(data.product_offer.offer_id) ? 'در برنامه' : 'به برنامه'}
                       </Button>
+                    </div>
+                  )}
+                  {bargain && (
+                    <div className="border-t pt-2.5">
+                      <BargainCard output={bargain} embedded />
                     </div>
                   )}
                 </section>

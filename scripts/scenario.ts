@@ -225,6 +225,16 @@ async function main() {
   await snapAs(page, '27-seller-message');
   await page.keyboard.press('Escape');
   await page.waitForTimeout(300);
+
+  // F5) «کارت چانه‌زنی» on a pricier seller: market range, ≤ 4 talking points, a target price
+  await page.locator('article[id^="shop-"]', { hasText: 'گوشی مارکت' }).first().getByRole('button', { name: 'کارت چانه‌زنی' }).click();
+  const bargain = page.locator('[data-bargain]').last();
+  await bargain.waitFor({ timeout: 60_000 });
+  await waitIdle(page);
+  const bargainText = await bargain.innerText();
+  const points = await bargain.locator('li').count();
+  check('F5. bargaining card (position, ≤ 4 points, target price or «منصفانه»)', /میانه بازار/.test(bargainText) && points >= 1 && points <= 4 && /قیمت هدف|منصفانه/.test(bargainText), `${points} points`);
+  await snapAs(page, '28-bargain-card', '[data-bargain]');
   if (upto < 5) return finish();
 
   // 5) follow up the top 3 → live board with mixed outcomes → automatic alternatives

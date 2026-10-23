@@ -1,7 +1,7 @@
 'use client';
 
 import { useState } from 'react';
-import { Info, ListPlus, ListChecks, MessageCircle, MessageSquareText, Navigation, Phone, PhoneCall, Sparkles } from 'lucide-react';
+import { Handshake, Info, ListPlus, ListChecks, MessageCircle, MessageSquareText, Navigation, Phone, PhoneCall, Sparkles } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { cn } from '@/lib/utils';
 import { formatDistance } from '@/lib/fa/format';
@@ -89,6 +89,16 @@ export function SellerCard({ row, rank, availability, productTitle }: { row: Sel
           <Sparkles className="mt-0.5 size-3.5 shrink-0" />
           {row.why.join(' · ')}
         </p>
+      )}
+      {row.price !== null && row.price_flag === 'ok' && (
+        <button
+          disabled={busy}
+          onClick={() => sendAction(`کارت چانه‌زنی برای «${row.shop_name}»`, 'bargaining_card', { offer_id: row.offer_id })}
+          className="mt-2 inline-flex h-8 items-center gap-1 rounded-full border bg-background px-2.5 text-[11px] font-medium hover:bg-muted disabled:opacity-60"
+        >
+          <Handshake className="size-3.5" />
+          کارت چانه‌زنی
+        </button>
       )}
 
       {askChannel ? (

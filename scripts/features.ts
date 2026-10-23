@@ -7,6 +7,8 @@ import { appNow } from '../lib/data/hours';
 import { visitTime } from '../lib/search/visit-time';
 import { specQa } from '../lib/agent/spec-qa';
 import { groundedIn, NOT_LISTED } from '../lib/search/spec-qa';
+import { bargainingCard } from '../lib/search/market';
+import { findSellers } from '../lib/search/sellers';
 
 process.env.LLM_PROVIDER = 'offline';
 
@@ -58,9 +60,21 @@ async function f8() {
   }
 }
 
+async function f5() {
+  const state = demoState();
+  const now = appNow(DEMO_TIME);
+  const list = await findSellers({ product_ids: [A17_128_4], lat: state.location.lat, lon: state.location.lon, radius_m: state.radius_m, now });
+  const top = await bargainingCard({ offer_id: list.rows[0].offer_id, state, now });
+  check('F5 card for the top A17 seller: position, delta, ≤ 4 points', Boolean(top.position) && Number.isFinite(top.delta_pct) && top.talking_points.length >= 1 && top.talking_points.length <= 4, `${top.shop_name}: ${top.position} ${top.delta_pct}% · ${top.talking_points.length} points · ${top.fair ? 'fair' : top.target_price}`);
+  const dear = list.rows.filter((r) => r.price && r.price_flag === 'ok').sort((a, b) => b.price! - a.price!)[0];
+  const card = await bargainingCard({ offer_id: dear.offer_id, state, now });
+  check('F5 a pricier offer gets a target price below its price, numbers from the DB', card.target_price !== null && card.target_price < card.price && card.stats.n >= 10, `${card.shop_name}: ${card.price} → ${card.target_price} (median ${card.stats.median})`);
+}
+
 async function main() {
   await f11();
   await f8();
+  await f5();
   let failed = 0;
   for (const [name, ok, detail] of checks) {
     if (!ok) failed++;
