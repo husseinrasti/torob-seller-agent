@@ -6,6 +6,8 @@ import type { FollowupStatus } from '../agent/state';
 import { followupResult, groundTruth } from './seller';
 import { sellerTranscript, templateTranscript, type TranscriptLine } from './persona';
 
+export const SIM_DISCLAIMER = 'شبیه‌سازی‌شده — در نسخه واقعی از طریق پیام‌رسان/تماس ترب انجام می‌شود.';
+
 export type FollowupItem = {
   id: string;
   offer_id: string;
@@ -190,4 +192,21 @@ export async function sessionFollowups(sessionId: string): Promise<FollowupItem[
     [sessionId],
   );
   return getFollowups(rows.map((r) => r.id));
+}
+
+const isPending = (i: FollowupItem) => i.status === 'contacting' || i.status === 'pending';
+
+/**
+ * Waits for simulated replies (each resolves at its `due_at`, 1.5–4 s) up to `timeoutMs`; replies still
+ * pending at the deadline keep resolving afterwards (the UI polls them).
+ */
+export async function awaitFollowups(ids: string[], opts: { timeoutMs: number; sessionId?: string }): Promise<FollowupItem[]> {
+  const until = Date.now() + opts.timeoutMs;
+  let items = await getFollowups(ids, opts.sessionId);
+  while (items.some(isPending) && Date.now() < until) {
+    const nextDue = Math.min(...items.filter(isPending).map((i) => new Date(i.due_at).getTime()));
+    await new Promise((r) => setTimeout(r, Math.max(50, Math.min(nextDue - Date.now() + 20, until - Date.now()))));
+    items = await getFollowups(ids, opts.sessionId);
+  }
+  return items;
 }
