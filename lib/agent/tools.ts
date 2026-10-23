@@ -4,6 +4,7 @@ import { routeCategories } from '../search/categories';
 import { compareProducts, searchProducts } from '../search/products';
 import { findSellers, shopDetails } from '../search/sellers';
 import { matchPlace } from '../search/places';
+import { normalizeForSearch } from '../fa/normalize';
 import { q } from '../db/client';
 import { formatDistance, formatTomanShort } from '../fa/format';
 import { toFaDigits } from '../fa/digits';
@@ -147,7 +148,11 @@ export const TOOL_DEFS = {
     description:
       'Change search context from conversation: location by place name («نزدیک تجریش», «پاساژ علاءالدین»), radius («تا ۲ کیلومتر»), filters («فقط قسطی», «الان باز»), ranking intent, or the chosen product. Call this BEFORE find_sellers when the user mentions any of these.',
     input: z.object({
-      location_text: z.string().max(80).optional().describe('place name as the user said it'),
+      location_text: z
+        .string()
+        .max(80)
+        .optional()
+        .describe('a DIFFERENT place the user named («نزدیک تجریش», «پاساژ علاءالدین»); omit for «نزدیک من»/«اطراف من» — that is the current location'),
       radius_m: z.number().int().min(200).max(20000).optional(),
       filters: FiltersInput.optional(),
       intent: z.enum(['balanced', 'cheapest', 'nearest', 'now']).optional(),
@@ -157,7 +162,8 @@ export const TOOL_DEFS = {
       const st = ctx.state;
       const changes: string[] = [];
       let unresolved: string | undefined;
-      if (i.location_text) {
+      const sameAsCurrent = (t: string) => normalizeForSearch(st.location.label.replace(/\(.*?\)/g, '')) === normalizeForSearch(t);
+      if (i.location_text && !/^(من|خودم|اینجا|همین جا|همینجا)$/u.test(i.location_text.trim()) && !sameAsCurrent(i.location_text)) {
         const place = await matchPlace(i.location_text);
         if (place) {
           st.location = { lat: place.lat, lon: place.lon, label: place.name, source: 'text' };
