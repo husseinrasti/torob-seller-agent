@@ -9,7 +9,7 @@ export function SuggestedActions({ items }: { items: Suggestion[] }) {
   if (!items.length) return null;
   return (
     <div className="no-scrollbar flex gap-1.5 overflow-x-auto px-3 pt-2">
-      {items.slice(0, 6).map((s) => (
+      {items.slice(0, 4).map((s) => (
         <button
           key={s.label}
           disabled={busy && s.kind !== 'patch'}

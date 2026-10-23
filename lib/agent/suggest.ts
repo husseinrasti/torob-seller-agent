@@ -17,6 +17,9 @@ export const HERO_CHIPS = [
 /** Feature pack 2 entry points on the hero (F2 in-mall, F3 basket); F1 is the composer's camera button. */
 export const HERO_NEW = ['الان توی پاساژ علاءالدینم', 'گوشی + کاور + گلس یکجا'];
 
+/** The situational demo (mentor scenario): nothing open nearby at night, a bazaar in between. */
+export const HERO_NIGHT = 'ساعت ۱۱:۳۰ شب، شارژر گوشی می‌خوام';
+
 export const MISSION_EXAMPLE =
   'من یه گوشی سامسونگ حدود قیمت ۵۰ میلیون تومن میخوام. محدوده سعادت آباد باشه. و خودت بپرس ببین قیمت‌هاشون آپدیت هست یا نه و اینکه الان باز هستند.';
 

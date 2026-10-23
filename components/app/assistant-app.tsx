@@ -154,7 +154,7 @@ function Workspace({ chatId, initialMessages, me, chats, onNewChat, onOpenChat, 
     const fromTool = lastToolSuggestions(messages) ?? [];
     const seen = new Set(fromTool.map((s) => s.label));
     const fromState = session.suggestions.filter((s) => s.kind !== 'message' && !seen.has(s.label));
-    return [...fromTool, ...fromState].slice(0, 6);
+    return [...fromTool, ...fromState].slice(0, 4);
   }, [messages, session.suggestions]);
 
   const history = (

@@ -1,6 +1,8 @@
 'use client';
 
 import { Switch } from '@/components/ui/switch';
+import { cn } from '@/lib/utils';
+import { formatTomanShort } from '@/lib/fa/format';
 import { ToggleGroup, ToggleGroupItem } from '@/components/ui/toggle-group';
 import type { Intent } from '@/lib/search/score';
 import { useSession } from '../session-context';
@@ -23,12 +25,29 @@ const INTENTS: Array<[Intent, string]> = [
   ['now', 'الان باز'],
 ];
 
-export function ConditionsSheet({ open, onOpenChange }: { open: boolean; onOpenChange: (v: boolean) => void }) {
+const BUDGETS = [1_000_000, 3_000_000, 10_000_000, 30_000_000, 60_000_000, 100_000_000];
+
+/** All filters in one sheet (the ContextBar keeps only location · radius · «فیلترها»). */
+export function FiltersSheet({ open, onOpenChange }: { open: boolean; onOpenChange: (v: boolean) => void }) {
   const { state, patch } = useSession();
   if (!state) return null;
+  const cap = state.filters.max_price ?? null;
   return (
-    <BottomSheet open={open} onOpenChange={onOpenChange} title="شرایط خرید و ترتیب" description="تغییرات بلافاصله روی فهرست فروشنده‌ها اعمال می‌شود.">
+    <BottomSheet open={open} onOpenChange={onOpenChange} title="فیلترها" description="تغییرات بلافاصله روی فهرست فروشنده‌ها اعمال می‌شود.">
       <div className="space-y-4 py-2">
+        <div>
+          <p className="mb-2 text-xs font-semibold text-muted-foreground">سقف قیمت{cap ? ` · تا ${formatTomanShort(cap)} تومان` : ''}</p>
+          <div className="flex flex-wrap gap-1.5" data-budget-presets>
+            {BUDGETS.map((b) => (
+              <button key={b} onClick={() => patch({ filters: { max_price: cap === b ? null : b } })} className={cn('h-10 rounded-full border px-3 text-xs', cap === b ? 'border-primary bg-primary text-primary-foreground' : 'hover:bg-muted')}>
+                {formatTomanShort(b)}
+              </button>
+            ))}
+            <button onClick={() => patch({ filters: { max_price: null } })} className={cn('h-10 rounded-full border px-3 text-xs', !cap ? 'border-primary bg-primary text-primary-foreground' : 'hover:bg-muted')}>
+              بدون سقف
+            </button>
+          </div>
+        </div>
         <div>
           <p className="mb-2 text-xs font-semibold text-muted-foreground">اولویت مرتب‌سازی</p>
           <ToggleGroup type="single" variant="outline" className="w-full" value={state.intent} onValueChange={(v) => v && patch({ intent: v as Intent })}>
