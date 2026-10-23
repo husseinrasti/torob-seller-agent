@@ -7,7 +7,7 @@ import { model } from '../lib/llm';
 
 const PROVIDERS = [
   { name: 'openai', key: 'OPENAI_API_KEY', fallbackModel: 'gpt-4.1-mini' },
-  { name: 'google', key: 'GOOGLE_GENERATIVE_AI_API_KEY', fallbackModel: 'gemini-2.5-flash' },
+  { name: 'google', key: 'GOOGLE_GENERATIVE_AI_API_KEY', fallbackModel: 'gemini-3.1-flash-lite' },
   { name: 'openrouter', key: 'OPENROUTER_API_KEY', fallbackModel: 'openai/gpt-4.1-mini' },
 ] as const;
 
