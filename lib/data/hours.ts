@@ -59,7 +59,8 @@ function minToHHMM(min: number): string {
 
 /**
  * Declared shifts of one day as [start, end) minute ranges; end < start means "until midnight".
- * Zero-length shifts («00:00–00:00») are placeholders in the data and are ignored.
+ * Shifts starting at 00:00 are placeholders in the data («00:00–00:00», «00:00–10:00» next to it,
+ * «00:00–23:59» — 483 day entries) and are ignored: a day left without shifts is unknown, never «open 24 h».
  */
 export function shiftsOf(day: DayHours | undefined): Array<[number, number]> | null {
   if (!day || day.status !== 'declared' || !day.shifts?.length) return null;
@@ -70,7 +71,7 @@ export function shiftsOf(day: DayHours | undefined): Array<[number, number]> | n
       if (end < start) end = 1440;
       return [start, end];
     })
-    .filter(([start, end]) => end > start)
+    .filter(([start, end]) => start > 0 && end > start)
     .sort((a, b) => a[0] - b[0]);
   return shifts.length ? shifts : null;
 }

@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { openState, parseDemoTime, hoursKnown, todayHoursText, type WeeklyHours } from './hours';
+import { openState, parseDemoTime, hoursKnown, shiftsOf, todayHoursText, type WeeklyHours } from './hours';
 
 // Shape copied from data/shops.csv (shop_3f93a30a9e66c6dece07cdff)
 const WEEK: WeeklyHours = {
@@ -99,5 +99,33 @@ describe('helpers', () => {
   it('todayHoursText', () => {
     expect(todayHoursText(WEEK, at('2026-10-27T09:00'))).toBe('امروز ۱۰:۰۰ تا ۱۳:۰۰ و ۱۶:۰۰ تا ۱۹:۰۰');
     expect(todayHoursText(WEEK, at('2026-10-23T09:00'))).toBe('امروز تعطیل');
+  });
+});
+
+describe('00:00–00:00 placeholder shifts (3,689 on Saturdays in the dataset)', () => {
+  const placeholder = { status: 'declared', shifts: [{ start_time: '00:00:00', end_time: '00:00:00' }] };
+  const real = { status: 'declared', shifts: [{ start_time: '10:00:00', end_time: '21:30:00' }] };
+  // 2026-10-24 is a Saturday
+  const satNoon = new Date('2026-10-24T12:00:00+03:30');
+
+  it('a declared 00:00–00:00 day is unknown, never «open 24 h»', () => {
+    expect(shiftsOf(placeholder)).toBeNull();
+    const st = openState({ sat: placeholder, sun: real }, satNoon);
+    expect(st.known).toBe(false);
+    expect(st.open).toBeNull();
+    expect(st.label).toBe('ساعت کاری امروز ثبت نشده');
+  });
+
+  it('the next opening skips placeholder days', () => {
+    // Friday 23:30 → Saturday is a placeholder → Sunday 10:00
+    const st = openState({ fri: { status: 'closed' }, sat: placeholder, sun: real }, new Date('2026-10-23T23:30:00+03:30'));
+    expect(st.open).toBe(false);
+    expect(st.nextOpen).toEqual({ day: 'یکشنبه', time: '10:00' });
+  });
+
+  it('shifts starting at midnight («00:00–10:00», «00:00–23:59») are unreliable too', () => {
+    expect(shiftsOf({ status: 'declared', shifts: [{ start_time: '00:00:00', end_time: '10:00:00' }, { start_time: '00:00:00', end_time: '00:00:00' }] })).toBeNull();
+    expect(openState({ sun: { status: 'declared', shifts: [{ start_time: '00:00:00', end_time: '23:59:00' }] } }, new Date('2026-10-25T23:30:00+03:30')).open).toBeNull();
+    expect(shiftsOf({ status: 'declared', shifts: [{ start_time: '00:00:00', end_time: '00:00:00' }, { start_time: '10:00:00', end_time: '19:00:00' }] })).toEqual([[600, 1140]]);
   });
 });
