@@ -3,6 +3,7 @@ import { findSellers, type SellerRow, type SellersResult } from '../../search/se
 import { searchProducts } from '../../search/products';
 import type { Filters } from '../../search/score';
 import { awaitFollowups, SIM_DISCLAIMER, startFollowups, type FollowupItem } from '../../sim/followups';
+import { decideWhereToBuy, resolveNeed } from '../../search/decide-data';
 import { buildPlan } from '../../plan/service';
 import { formatDistance, formatTomanShort } from '../../fa/format';
 import { toFaDigits } from '../../fa/digits';
@@ -374,8 +375,23 @@ export async function runMission(mission: Mission, text: string, ctx: MissionCtx
         : `در شعاع ${formatDistance(requested)} فقط ${toFaDigits(cov.inRequested)} فروشنده ثبت شده بود؛ جست‌وجو تا ${formatDistance(cov.used)} گسترش یافت.`;
   }
 
+  // «الان باز» / «ببین بازن»: when none of the reported sellers is open, the situational decision says what
+  // is (farther away, a bazaar nearby, the earliest opening) instead of an empty answer
+  let decisionChip: Suggestion | null = null;
+  if ((m.conditions.open_now || m.verify.hours) && st.chosenProduct && !rows.some((r) => r.open.open === true)) {
+    const need = await resolveNeed({ product_id: st.chosenProduct }).catch(() => null);
+    if (need) {
+      const d = await decideWhereToBuy({ need, location: { lat: st.location.lat, lon: st.location.lon, label: st.location.label }, at: ctx.now, urgency: 'now', radius_m: Math.max(cov.used, 2000), now: ctx.now }).catch(() => null);
+      if (d?.recommended && d.recommended !== 'open_listed_near') {
+        note = [note, d.verdict].filter(Boolean).join(' ');
+        decisionChip = { kind: 'action', label: 'الان کجا باز است؟', text: 'الان کجا می‌توانم بخرم؟', tool: 'decide_where_to_buy', input: { product_id: st.chosenProduct, urgency: 'now' } };
+      }
+    }
+  }
+
   // next steps the user can tap
   const next: Suggestion[] = [];
+  if (decisionChip) next.push(decisionChip);
   if (!plan && planIds.length) next.push({ kind: 'action', label: 'برنامه مراجعه', text: 'برنامه مراجعه را بچین', tool: 'plan_trip', input: { offer_ids: planIds } });
   const uncontacted = rows.filter((r) => !r.followup && r.verdict !== 'avoid').slice(0, 3);
   if (uncontacted.length) {

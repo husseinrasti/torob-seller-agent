@@ -26,6 +26,7 @@ import { basketPlan, resolveBasketItem, resolveBasketItems, type BasketOutput, t
 import { modelCodeOf } from '../plan/basket';
 import { photoMatch, VisionInput, type PhotoMatchOutput } from '../vision/photo-match';
 import { isMission } from './mission/extract';
+import { decideWhereToBuy, resolveNeed, type DecisionOutput } from '../search/decide-data';
 import { haversine } from '../geo';
 import { WEEK, visitSentence } from '../data/hours-stats';
 import { atLocalTime, FA_DAY } from '../data/hours';
@@ -265,6 +266,8 @@ export const TOOL_DEFS = {
         now: ctx.now,
       });
       const suggested = sellerSuggestions({ ui: 'sellers', ...res }, st);
+      // «الان باز» asked and nobody is open → the situational decision, never «چیزی پیدا نشد»
+      if (st.filters.open_now && res.count === 0) suggested.unshift({ kind: 'action', label: 'الان کجا باز است؟', text: 'الان کجا می‌توانم بخرم؟', tool: 'decide_where_to_buy', input: { product_id: productId, urgency: 'now' } });
       // F2: standing in (or right next to) a mall → its floor-by-floor view
       const mall = (await loadPlaces()).find((p) => p.kind === 'mall' && p.mall_key && haversine(st.location.lat, st.location.lon, p.lat, p.lon) <= 150);
       if (mall?.mall_key) suggested.unshift({ kind: 'action', label: `نمای داخل ${mall.name}`, text: `الان توی ${mall.name} هستم؛ طبقه‌به‌طبقه نشان بده`, tool: 'mall_view', input: { mall_key: mall.mall_key } });
@@ -277,6 +280,7 @@ export const TOOL_DEFS = {
       filters: o.params.filters,
       intent: o.params.intent,
       count: o.count,
+      ...(o.params.filters.open_now && o.count === 0 ? { no_open_seller: 'call decide_where_to_buy (product_id) instead of saying nothing was found' } : {}),
       total_in_radius_before_filters: o.total_in_radius,
       clusters: o.clusters.map((c) => ({ mall: c.mall_name, sellers: c.count, best_price: c.best_price })),
       relaxations: o.relaxations,
@@ -463,6 +467,39 @@ export const TOOL_DEFS = {
       return Object.values(overrides).some(Boolean) ? { ...res, overrides } : res;
     },
     toModel: (o) => missionForModel(o),
+  }),
+
+  decide_where_to_buy: def({
+    description:
+      'Situational «where can I buy it right now?»: for a need at a moment («ساعت ۱۱:۳۰ شب شارژر»، «جمعه ظهر هدفون»، «۱۵ دقیقه دیگه قطار دارم») returns tiers — open listed shops near, open but farther (travel time, closes in N min), nearby bazaars/hubs that may be open though not in Torob, shops with unknown hours, and the earliest opening — with a recommended tier and trade-offs, shown on a map. MUST be used for time words (الان، این ساعت، شب، ساعت ۱۱، فوری، کجا بازه) and whenever find_sellers finds no open seller while «الان باز» was asked — never reply «چیزی پیدا نشد». Say at most 2 sentences after it: the verdict and the trade-off.',
+    input: z.object({
+      need_text: z.string().max(80).optional().describe('the product words only, e.g. «شارژر گوشی»'),
+      product_id: z.string().optional(),
+      urgency: z.enum(['now', 'today', 'flexible']).optional(),
+      radius_m: z.number().int().min(200).max(8000).optional(),
+      transport: z.enum(['auto', 'walk', 'car']).optional(),
+      at_time: z.string().regex(/^\d{2}:\d{2}$/).optional().describe('HH:MM local time the user means'),
+      day_offset: z.number().int().min(0).max(7).optional(),
+      location_text: z.string().max(80).optional(),
+    }),
+    run: async (i, ctx): Promise<DecisionOutput> => {
+      const st = ctx.state;
+      if (i.location_text) await TOOL_DEFS.set_context.run({ location_text: i.location_text }, ctx);
+      const need = await resolveNeed({ text: i.need_text, product_id: i.product_id ?? (i.need_text ? null : st.chosenProduct) });
+      const urgency = i.urgency ?? 'now';
+      const at = i.at_time ? atLocalTime(ctx.now, i.at_time, i.day_offset ?? 0) : i.day_offset ? atLocalTime(ctx.now, '10:00', i.day_offset) : ctx.now;
+      const radius = i.radius_m ?? (urgency === 'now' ? Math.max(st.radius_m, 2000) : st.radius_m);
+      return decideWhereToBuy({ need, location: { lat: st.location.lat, lon: st.location.lon, label: st.location.label }, at, urgency, radius_m: radius, transport: i.transport, now: ctx.now });
+    },
+    toModel: (o) => ({
+      need: o.need,
+      at: o.at_label,
+      recommended: o.recommended,
+      verdict: o.verdict,
+      tiers: o.tiers.map((t) => ({ tier: t.key, empty: t.empty, verdict: t.verdict })),
+      tradeoffs: o.tradeoffs,
+      instruction: 'The map and cards show everything; reply in at most 2 Persian sentences: the verdict and the main trade-off.',
+    }),
   }),
 
   photo_search: def({

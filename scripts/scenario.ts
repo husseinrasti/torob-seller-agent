@@ -5,7 +5,7 @@ import fs from 'node:fs';
 
 const base = process.argv.find((a) => a.startsWith('http')) || process.env.APP_URL || 'http://localhost:3010';
 const out = process.argv.find((a) => a.startsWith('--out='))?.slice(6) || 'docs/screenshots/tmp';
-const upto = Number(process.argv.find((a) => a.startsWith('--upto='))?.slice(7) || 9);
+const upto = Number(process.argv.find((a) => a.startsWith('--upto='))?.slice(7) || 10);
 const dark = process.argv.includes('--dark');
 const desktop = process.argv.includes('--desktop');
 const USER = 'داور';
@@ -79,7 +79,7 @@ async function main() {
   // demo user with a clean history and memory
   await page.goto(`${base}/demo-reset?demo_time=${DEMO_TIME}&name=${encodeURIComponent(USER)}`, { waitUntil: 'networkidle' });
   await page.getByRole('button', { name: 'گوشی سامسونگ تا ۶۰ میلیون نزدیک من' }).waitFor({ timeout: 30_000 });
-  check('0. hero: in-mall and basket chips, camera hint', (await page.locator('[data-hero-new]').count()) === 2 && (await page.locator('[data-camera-hint]').isVisible()) && (await page.locator('[data-photo-input]').count()) === 1);
+  check('0. minimal hero: ≤ 3 example chips (+ «نمونه‌های بیشتر» with in-mall/basket), camera hint', (await page.locator('[data-hero-chip]').count()) <= 3 && (await page.locator('[data-hero-new]').count()) === 2 && (await page.locator('[data-camera-hint]').isVisible()) && (await page.locator('[data-photo-input]').count()) === 1);
   await snap(page, 'home');
 
   // 1) chip → product cards
@@ -155,7 +155,11 @@ async function main() {
 
   // 3b) ContextBar changes re-filter without the LLM
   const before = chatCalls.length;
-  await page.locator('[data-chip="open_now"]').click();
+  // minimal ContextBar: «فیلترها» holds open-now / installment / budget
+  await page.locator('[data-chip="filters"]').click();
+  await page.locator('#f-open_now').click();
+  await page.keyboard.press('Escape');
+  await page.waitForTimeout(300);
   await page.locator('[data-chip="radius"]').click();
   await page.getByRole('button', { name: '۵۰۰ متر' }).click();
   await page.waitForFunction(() => /در شعاع ۵۰۰ متر/.test(document.body.innerText), null, { timeout: 30_000 });
@@ -164,7 +168,9 @@ async function main() {
   check('3. open-now + 500 m shrink the list without /api/chat', chatCalls.length === before, `${h2}; chat calls during change: ${chatCalls.length - before}`);
   await snap(page, 'sellers-open-500m', 'section[aria-busy]');
 
-  await page.locator('[data-chip="installment"]').click();
+  await page.locator('[data-chip="filters"]').click();
+  await page.locator('#f-installment').click();
+  await page.keyboard.press('Escape');
   await page.getByRole('button', { name: /حذف فیلتر قسطی/ }).waitFor({ timeout: 30_000 });
   const h3 = await page.locator('section[aria-busy] h3').last().innerText();
   check('3. installment → ≤2 + relaxation banner', /^[۰-۲] /.test(h3.trim()) || /[۰۱۲] فروشنده/.test(h3), h3);
@@ -228,7 +234,9 @@ async function main() {
   await page.waitForTimeout(300);
 
   // F5) «کارت چانه‌زنی» on a pricier seller: market range, ≤ 4 talking points, a target price
-  await page.locator('article[id^="shop-"]', { hasText: 'گوشی مارکت' }).first().getByRole('button', { name: 'کارت چانه‌زنی' }).click();
+  const marketCard = page.locator('article[id^="shop-"]', { hasText: 'گوشی مارکت' }).first();
+  await marketCard.locator('[data-more]').click();
+  await marketCard.getByRole('button', { name: 'کارت چانه‌زنی' }).click();
   const bargain = page.locator('[data-bargain]').last();
   await bargain.waitFor({ timeout: 60_000 });
   await waitIdle(page);
@@ -387,10 +395,58 @@ async function main() {
   await page.waitForFunction(() => document.querySelectorAll('[data-photo-match]').length >= 2, null, { timeout: 60_000 });
   await waitIdle(page);
   check('F1. unrelated photo → «نتونستم تشخیص بدم، اسمش رو بنویس»', /نتونستم تشخیص بدم، اسمش رو بنویس/.test(await page.locator('[data-photo-match]').last().innerText()));
-  await page.locator('[data-photo-match="recognized"]').last().locator('[data-photo-yes]').click();
-  await page.locator('[data-role="assistant"]').last().getByText(/فروشنده در شعاع/).waitFor({ timeout: 60_000 });
-  await waitIdle(page);
-  check('F1. «همین است» → sellers of the matched product', /A17/.test(await page.locator('section', { hasText: 'فروشنده در شعاع' }).last().innerText()));
+  // the vision provider can be out of credit: record it and keep going (the decision steps need no LLM)
+  if (await page.locator('[data-photo-match="recognized"]').count()) {
+    await page.locator('[data-photo-match="recognized"]').last().locator('[data-photo-yes]').click();
+    await page.locator('[data-role="assistant"]').last().getByText(/فروشنده در شعاع/).waitFor({ timeout: 60_000 });
+    await waitIdle(page);
+    check('F1. «همین است» → sellers of the matched product', /A17/.test(await page.locator('section', { hasText: 'فروشنده در شعاع' }).last().innerText()));
+  } else check('F1. «همین است» → sellers of the matched product', false, 'no recognized photo (vision provider unavailable?)');
+  if (upto < 10) return finish();
+
+  // 10) situational decisions (S1–S4): the map is the answer; time/radius/urgency controls re-run without the LLM
+  const decisionFor = async (demo: string, text: string) => {
+    await page.goto(`${base}/demo-reset?demo_time=${encodeURIComponent(demo)}&name=${encodeURIComponent(USER)}`, { waitUntil: 'domcontentloaded' });
+    await page.locator('[data-hero-chip]').first().waitFor({ timeout: 30_000 });
+    const n = await page.locator('[data-decision]').count();
+    await page.locator('textarea').fill(text);
+    await page.locator('textarea').press('Enter');
+    await page.waitForFunction((k) => document.querySelectorAll('[data-decision]').length > k, n, { timeout: 60_000 });
+    await waitIdle(page);
+    await page.waitForTimeout(1200); // map tiles + fitBounds
+    return page.locator('[data-decision]').last();
+  };
+  const tierText = async (d: ReturnType<Page['locator']>, key: string) => (await d.locator(`[data-tier="${key}"]`).innerText().catch(() => '')).replace(/\n/g, ' ');
+
+  // S1 23:30 at هفت‌تیر: nothing open near → the bazaar, the earliest opening tomorrow
+  let d = await decisionFor('2026-10-25T23:30', 'ساعت ۱۱:۳۰ شب، شارژر گوشی می‌خوام نزدیک میدان هفت تیر');
+  const s1 = await d.innerText();
+  check('S1. night: T1 empty (said), bazaar card, earliest opening, map with hub', /هیچ فروشنده‌ی ثبت‌شده/.test(await tierText(d, 'open_listed_near')) && /بورس موبایل جمهوری/.test(s1) && /فردا/.test(await tierText(d, 'opens_soonest')) && (await d.locator('.hk-dm-hub').count()) >= 1 && (await d.locator('.hk-dm-user').count()) === 1, (await d.getAttribute('data-recommended')) ?? '');
+  const reply = (await page.locator('[data-role="assistant"]').last().innerText()).split('\n').filter((l) => l.trim() && !/دستیار هوشمند|حالت ساده/.test(l)).pop() ?? '';
+  check('S1. agent text ≤ 2 sentences', reply.split(/[.؟!](?:\s|$)/).filter((x) => x.trim()).length <= 2, reply.slice(0, 120));
+  await snapAs(page, '24-decision-night', '[data-decision]');
+
+  // S2 18:40: open near with «عجله کن», later-closing ones farther; the time scrubber moves the verdict
+  d = await decisionFor('2026-10-25T18:40', 'همین الان شارژر گوشی می‌خوام نزدیک میدان هفت تیر');
+  check('S2. evening: open near with «عجله کن», recommended T1', (await d.locator('[data-tier="open_listed_near"] [data-hurry]').count()) >= 1 && (await d.getAttribute('data-recommended')) === 'open_listed_near');
+  await snapAs(page, '25-decision-evening', '[data-decision]');
+  const v1 = await d.locator('[data-decision-verdict]').innerText();
+  await d.locator('[data-time-scrubber]').fill('50');
+  await page.waitForFunction((t) => document.querySelector('[data-decision]:last-of-type [data-decision-verdict]')?.textContent !== t, v1, { timeout: 20_000 }).catch(() => {});
+  await page.waitForTimeout(900);
+  const v2 = await page.locator('[data-decision]').last().locator('[data-decision-verdict]').innerText();
+  check('S2. time scrubber to 19:30 re-runs without the LLM and changes the verdict', v2 !== v1 && /ساعت ۱۹:۳۰/.test(v2), v2);
+  await snapAs(page, '26-decision-time-scrubber', '[data-decision]');
+
+  // S3 Friday noon at سهروردی: Friday closures, no invented open shop, the next opening after Friday
+  d = await decisionFor('2026-10-30T11:00', 'جمعه ظهر هدفون می‌خوام نزدیک سهروردی');
+  const s3 = await d.innerText();
+  check('S3. Friday: «جمعه N٪ … تعطیل», next opening after Friday', /جمعه [۰-۹]+٪/.test(s3) && /(?:شنبه|یکشنبه) [۰-۹]{2}:[۰-۹]{2}/.test(await tierText(d, 'opens_soonest')), (await d.locator('[data-decision-verdict]').innerText()).slice(0, 100));
+  await snapAs(page, '27-decision-friday', '[data-decision]');
+
+  // S4 «۱۵ دقیقه دیگه قطار دارم» at فردوسی: walking, 600 m, nearest open first
+  d = await decisionFor('2026-10-25T16:00', 'کابل تایپ‌سی، ۱۵ دقیقه دیگه قطار دارم');
+  check('S4. train in 15 min: walking, 600 m, nearest open first', (await d.locator('[data-seg="transport:walk"][aria-checked="true"]').count()) === 1 && /۶۰۰ متر/.test(await d.locator('[data-decision-verdict]').innerText()) && (await d.getAttribute('data-recommended')) === 'open_listed_near', await d.locator('[data-decision-verdict]').innerText());
 
   return finish();
 

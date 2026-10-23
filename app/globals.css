@@ -149,3 +149,94 @@
   border-radius: 8px;
   color: #0f172a;
 }
+
+/* Decision map (F: situational decisions) — markers fade/scale in when the decision changes */
+.hk-dm {
+  font-family: var(--font-vazirmatn), sans-serif;
+  direction: rtl;
+  white-space: nowrap;
+  cursor: pointer;
+  opacity: 0;
+  /* MapLibre positions markers with an inline transform, so only the opacity animates */
+  transition: opacity 0.3s ease;
+}
+.hk-dm.hk-in,
+.hk-dm-user.hk-in {
+  opacity: 1;
+}
+.hk-dm span {
+  display: inline-block;
+}
+.hk-dm-open {
+  font-size: 11px;
+  font-weight: 700;
+  color: #0f766e;
+  background: #fff;
+  border: 1.5px solid #0f766e;
+  border-radius: 9999px;
+  padding: 2px 8px;
+  box-shadow: 0 2px 6px rgb(15 23 42 / 0.15);
+}
+.hk-dm-open.hk-dm-hurry {
+  border-color: #d97706;
+  color: #b45309;
+}
+.hk-dm-rec {
+  background: #0f766e !important;
+  color: #fff !important;
+  border-color: #0f766e !important;
+  box-shadow: 0 0 0 5px rgb(15 118 110 / 0.22) !important;
+  z-index: 2;
+}
+.hk-dm-hub {
+  max-width: 230px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  font-size: 11px;
+  font-weight: 600;
+  color: #5b21b6;
+  background: rgb(255 255 255 / 0.92);
+  border: 1px solid rgb(109 40 217 / 0.35);
+  border-radius: 9999px;
+  padding: 3px 10px;
+}
+.hk-dm-hub.hk-dm-typical {
+  border: 1.5px solid #d97706;
+}
+.hk-dm-hub.hk-dm-rec {
+  background: #6d28d9 !important;
+  border-color: #6d28d9 !important;
+  box-shadow: 0 0 0 5px rgb(109 40 217 / 0.2) !important;
+}
+.hk-dm-unknown {
+  width: 22px;
+  height: 22px;
+  border-radius: 9999px;
+  border: 1.5px dashed #64748b;
+  background: rgb(255 255 255 / 0.9);
+  color: #475569;
+  font-size: 12px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+.hk-dm-eta {
+  font-size: 11px;
+  font-weight: 700;
+  color: #0f172a;
+  background: #fef3c7;
+  border-radius: 8px;
+  padding: 2px 8px;
+  box-shadow: 0 1px 4px rgb(15 23 42 / 0.2);
+  cursor: default;
+}
+.hk-dm-user {
+  width: 18px;
+  height: 18px;
+  border-radius: 9999px;
+  background: #0f766e;
+  border: 3px solid #fff;
+  box-shadow: 0 0 0 7px rgb(15 118 110 / 0.22);
+  opacity: 0;
+  transition: opacity 0.25s ease;
+}

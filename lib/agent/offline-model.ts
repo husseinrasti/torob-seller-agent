@@ -129,6 +129,10 @@ function summarize(toolName: string, v: Json | null, error?: string): string {
       return `${String(v.answer)}.`;
     case 'best_time_to_visit':
       return `${String(v.sentence)}.`;
+    case 'decide_where_to_buy': {
+      const trade = ((v.tradeoffs as string[] | undefined) ?? [])[0];
+      return [String(v.verdict ?? ''), trade].filter(Boolean).join(' ');
+    }
     case 'photo_search': {
       if (v.mission) return 'گزارش کامل برای کالای توی عکس آماده است.';
       if (!v.recognized || !((v.candidates as Json[] | undefined) ?? []).length) return String(v.message ?? 'نتونستم تشخیص بدم، اسمش رو بنویس');

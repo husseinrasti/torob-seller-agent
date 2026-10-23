@@ -15,6 +15,7 @@ import type { BargainOutput } from '../search/market';
 import type { MallViewOutput } from '../search/mall-view';
 import type { BasketOutput, BasketPlanOutput } from '../plan/basket-service';
 import type { PhotoMatchOutput } from '../vision/photo-match';
+import type { DecisionOutput } from '../search/decide-data';
 
 export type ClarifyOutput = { ui: 'clarify'; question: string; chips: string[] };
 
@@ -76,6 +77,7 @@ export type ToolOutput =
   | BasketOutput
   | BasketPlanOutput
   | PhotoMatchOutput
+  | DecisionOutput
   | ErrorOutput;
 
 /** Message metadata used by UI actions: run `tool` with `input` right away, then let the agent comment. */

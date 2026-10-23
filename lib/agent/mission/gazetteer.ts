@@ -78,6 +78,7 @@ export const GAZETTEER: GazetteerEntry[] = [
   { name: 'کریمخان', lat: 35.714, lon: 51.418, aliases: ['کریم خان'] },
   { name: 'هفت‌تیر', lat: 35.7155, lon: 51.4255, aliases: ['هفت تیر', 'میدان هفت تیر'] },
   { name: 'مفتح', lat: 35.713, lon: 51.429 },
+  { name: 'سهروردی', lat: 35.7305, lon: 51.4355, aliases: ['خیابان سهروردی', 'سهروردی شمالی'] },
   { name: 'قائم مقام', lat: 35.723, lon: 51.422 },
   { name: 'بهشتی', lat: 35.73, lon: 51.43, marker: true },
   { name: 'سیدخندان', lat: 35.741, lon: 51.444, aliases: ['سید خندان'] },

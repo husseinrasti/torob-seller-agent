@@ -13,19 +13,43 @@ import { saveMemory } from '@/lib/auth';
 import { errorResponse } from '@/lib/http';
 import { ACTION_TOOLS, buildTools, runTool, type ToolCtx } from '@/lib/agent/tools';
 import { systemPrompt } from '@/lib/agent/system-prompt';
-import { appNow } from '@/lib/data/hours';
+import { appNow, localClock } from '@/lib/data/hours';
 import { chatModel, llmMode } from '@/lib/llm';
 import { q } from '@/lib/db/client';
 import type { ActionMetadata } from '@/lib/agent/types';
 import { detectMission } from '@/lib/agent/mission/extract';
 import { isSpecQuestion } from '@/lib/search/spec-qa';
 import { placeIndex, scanLocation } from '@/lib/agent/mission/geocode';
+import { parseSituation } from '@/lib/agent/situation';
+import { decisionSpeech } from '@/lib/agent/decide';
+import type { DecisionOutput } from '@/lib/search/decide-data';
+import { normalizeForSearch } from '@/lib/fa/normalize';
 
 export const dynamic = 'force-dynamic';
 export const maxDuration = 60;
 
 const MAX_HISTORY = 16;
 const IN_MALL = /(?:^|\s)(?:الان|الآن|اکنون|همین الان)?\s*(?:توی|تو|داخل|درون)\s+(?:پاساژ|مرکز خرید|بازار)|(?:الان|الآن)\s+(?:توی|تو|داخل)\s+\S+م(?:\s|$|[.،!؟?])|(?:پاساژ|مرکز خرید)\s+\S+(?:م|ام|هستم)(?:\s|$|[.،!؟?])/u;
+
+/** A situational request → `decide_where_to_buy` input (the place, if named, moves the search first). */
+async function situationalAction(text: string, ctx: ToolCtx, opts: { strongOnly?: boolean } = {}): Promise<{ tool: string; input: Record<string, unknown> } | null> {
+  const sit = parseSituation(text, ctx.now);
+  if (!sit.situational || (opts.strongOnly && !sit.strong)) return null;
+  const hit = scanLocation(text, await placeIndex());
+  const need = hit ? sit.need_text.replace(normalizeForSearch(hit.phrase), ' ').replace(/\s+/g, ' ').trim() : sit.need_text;
+  if (need.length < 2 && !ctx.state.chosenProduct) return null;
+  const input: Record<string, unknown> = { urgency: sit.urgency };
+  if (need.length >= 2) input.need_text = need;
+  else input.product_id = ctx.state.chosenProduct;
+  if (hit) input.location_text = hit.phrase;
+  if (sit.radius_m) input.radius_m = sit.radius_m;
+  if (sit.transport) input.transport = sit.transport;
+  if (sit.at && Math.abs(sit.at.getTime() - ctx.now.getTime()) > 60_000) {
+    input.at_time = new Intl.DateTimeFormat('en-GB', { timeZone: 'Asia/Tehran', hour: '2-digit', minute: '2-digit', hourCycle: 'h23' }).format(sit.at);
+    input.day_offset = (localClock(sit.at).dayIdx - localClock(ctx.now).dayIdx + 7) % 7;
+  }
+  return { tool: 'decide_where_to_buy', input };
+}
 
 function persianError(err: unknown): string {
   const msg = err instanceof Error ? err.message : String(err);
@@ -101,7 +125,10 @@ export async function POST(req: Request) {
     const text = textOf(last);
     const det = text ? await detectMission(text, ctx.state).catch(() => null) : null;
     // «گوشی + کاور + گلس یکجا» → the basket: one seller per item, as many as possible in one mall
-    if (det?.mission.items && det.mission.items.length >= 2) {
+    // an explicit moment («ساعت ۱۱:۳۰ شب»، «جمعه ظهر»، «۱۵ دقیقه دیگه») without budget or checks: the decision map
+    const situational = text ? await situationalAction(text, ctx, { strongOnly: true }) : null;
+    if (situational && !(det?.mission.items && det.mission.items.length >= 2)) action = situational;
+    else if (det?.mission.items && det.mission.items.length >= 2) {
       const m = det.mission;
       action = { tool: 'basket_plan', input: { items: m.items, ...(m.location?.text ? { location_text: m.location.text } : {}), ...(m.verify.contact_sellers || m.verify.availability ? { verify: true } : {}) } };
     } else if (det?.mission_like) action = { tool: 'run_mission', input: { text } };
@@ -114,6 +141,8 @@ export async function POST(req: Request) {
       const hit = scanLocation(text, await placeIndex(), { relaxed: true });
       if (hit?.place.kind === 'mall' && hit.place.mall_key) action = { tool: 'mall_view', input: { mall_key: hit.place.mall_key } };
     }
+    // «ساعت ۱۱:۳۰ شب شارژر می‌خوام»، «جمعه ظهر هدفون»، «۱۵ دقیقه دیگه قطار دارم» → where it can be bought then
+    if (!action && text) action = (await situationalAction(text, ctx)) ?? undefined;
   }
 
   const stream = createUIMessageStream({
@@ -136,6 +165,17 @@ export async function POST(req: Request) {
             role: 'assistant',
             parts: [{ type: `tool-${action.tool}`, toolCallId, state: 'output-available', input: action.input, output } as UIMessage['parts'][number]],
           });
+          // the decision map speaks for itself: ≤ 2 sentences from the engine, no LLM round trip
+          if (action.tool === 'decide_where_to_buy') {
+            const textId = `${toolCallId}_t`;
+            writer.write({ type: 'finish-step' });
+            writer.write({ type: 'text-start', id: textId });
+            writer.write({ type: 'text-delta', id: textId, delta: decisionSpeech(output as DecisionOutput) });
+            writer.write({ type: 'text-end', id: textId });
+            writer.write({ type: 'finish' });
+            await persist(session.id, before, ctx.state).catch(() => {});
+            return;
+          }
         } catch (err) {
           const errorText = err instanceof Error ? err.message : 'خطا در اجرای درخواست';
           writer.write({ type: 'tool-output-error', toolCallId, errorText });
