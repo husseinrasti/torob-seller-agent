@@ -3,6 +3,7 @@ import { shortAddress } from '../search/sellers';
 import type { WeeklyHours } from '../data/hours';
 import type { SessionState, FollowupStatus } from '../agent/state';
 import { planTrip, type PlanPayload, type TripStop } from './trip';
+import { sessionFollowups } from '../sim/followups';
 
 /** Offers for the plan: the given ids, else shortlist ∪ confirmed/pending follow-ups (never out of stock / no answer). */
 export function defaultPlanOffers(state: SessionState): string[] {
@@ -14,7 +15,12 @@ export function defaultPlanOffers(state: SessionState): string[] {
 }
 
 export async function buildPlan(opts: { sessionId: string | null; state: SessionState; now: Date; offerIds?: string[] }): Promise<{ plan_id: string; payload: PlanPayload } | null> {
-  const ids = opts.offerIds?.length ? opts.offerIds.slice(0, 8) : defaultPlanOffers(opts.state);
+  // the follow-up rows are the source of truth for replies (state may lag behind a reply that just arrived)
+  const replies = opts.sessionId ? await sessionFollowups(opts.sessionId) : [];
+  const followups = { ...opts.state.followups };
+  for (const f of replies) followups[f.offer_id] = f.status;
+  const state = { ...opts.state, followups };
+  const ids = opts.offerIds?.length ? opts.offerIds.slice(0, 8) : defaultPlanOffers(state);
   if (!ids.length) return null;
   const rows = await q<{
     offer_id: string;
@@ -58,10 +64,10 @@ export async function buildPlan(opts: { sessionId: string | null; state: Session
     address_short: shortAddress(r.address),
     price: r.price,
     new_price: r.new_price,
-    followup_status: (opts.state.followups[r.offer_id] as FollowupStatus | undefined) ?? 'unverified',
+    followup_status: (state.followups[r.offer_id] as FollowupStatus | undefined) ?? 'unverified',
     weekly_hours: r.weekly_hours,
   }));
-  const payload = planTrip(stops, opts.state.location, opts.now);
+  const payload = planTrip(stops, state.location, opts.now);
   const [row] = await q<{ id: string }>('INSERT INTO plans (session_id, payload) VALUES ($1, $2) RETURNING id', [opts.sessionId, JSON.stringify(payload)]);
   return { plan_id: row.id, payload };
 }
