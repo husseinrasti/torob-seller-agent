@@ -22,6 +22,8 @@ import { sellerMessage, type SellerMessageOutput } from '../sim/seller-message';
 import { bargainingCard, type BargainOutput } from '../search/market';
 import { mallView, type MallViewOutput } from '../search/mall-view';
 import { loadPlaces } from '../search/places';
+import { basketPlan, resolveBasketItem, resolveBasketItems, type BasketOutput, type BasketPlanOutput } from '../plan/basket-service';
+import { modelCodeOf } from '../plan/basket';
 import { haversine } from '../geo';
 import { WEEK, visitSentence } from '../data/hours-stats';
 import { atLocalTime, FA_DAY } from '../data/hours';
@@ -110,6 +112,10 @@ function sellerSuggestions(out: Omit<SellersOutput, 'suggested_actions'>, state:
   if (state.intent !== 'cheapest') s.push({ kind: 'patch', label: 'ارزان‌ترین‌ها اول', patch: { intent: 'cheapest' } });
   s.push({ kind: 'message', label: 'چرا این اول شد؟', text: 'چرا این اول شد؟' });
   return s;
+}
+
+function basketSuggestions(st: SessionState): Suggestion[] {
+  return (st.basket?.length ?? 0) >= 2 ? [{ kind: 'action', label: 'برنامه‌ی یکجا', text: 'همه‌ی قلم‌های سبد را یکجا برنامه بچین', tool: 'basket_plan', input: {} }] : [];
 }
 
 export const TOOL_DEFS = {
@@ -526,6 +532,67 @@ export const TOOL_DEFS = {
       floors: o.mall.floors.map((f) => ({ floor: f.title, shops: f.shops.length, sellers: f.sellers, neighbours: f.neighbours })),
       hours: o.hours_summary,
       nearby_malls: o.nearby_malls,
+    }),
+  }),
+
+  basket_add: def({
+    description:
+      '«کاور و گلس هم می‌خوام»: add one or more lines to the «یکجا» basket (each line = the user words for one item, e.g. «کاور A17»، «گلس»، «پاوربانک ۲۰ هزار»). Each line is matched to products; the session search is not changed.',
+    input: z.object({ items: z.array(z.string().min(2).max(80)).min(1).max(6) }),
+    run: async (i, ctx): Promise<BasketOutput> => {
+      const st = ctx.state;
+      const have = new Set((st.basket ?? []).map((it) => normalizeForSearch(it.text)));
+      const fresh = [...new Set(i.items.map((t) => t.trim()))].filter((t) => !have.has(normalizeForSearch(t)));
+      const hint = [...(st.basket ?? []).map((it) => it.text), ...fresh].map(modelCodeOf).find(Boolean) ?? null;
+      const added = await Promise.all(fresh.map((t) => resolveBasketItem(t, st, hint)));
+      st.basket = [...(st.basket ?? []), ...added].slice(0, 8);
+      return { ui: 'basket', added: added.map((a) => a.text), removed: [], items: st.basket, suggested_actions: basketSuggestions(st) };
+    },
+    toModel: (o) => ({ added: o.added, basket: o.items.map((it) => ({ id: it.id, text: it.text, matched: it.title })) }),
+  }),
+
+  basket_remove: def({
+    description: 'Remove a line from the «یکجا» basket by its id (see session state) or by its words; «سبد را خالی کن» → all: true.',
+    input: z.object({ item_id: z.string().optional(), text: z.string().optional(), all: z.boolean().optional() }),
+    run: async (i, ctx): Promise<BasketOutput> => {
+      const st = ctx.state;
+      const items = st.basket ?? [];
+      const norm = i.text ? normalizeForSearch(i.text) : null;
+      const gone = items.filter((it) => i.all || it.id === i.item_id || (norm && normalizeForSearch(it.text).includes(norm)));
+      st.basket = items.filter((it) => !gone.includes(it));
+      return { ui: 'basket', added: [], removed: gone.map((g) => g.text), items: st.basket, suggested_actions: basketSuggestions(st) };
+    },
+    toModel: (o) => ({ removed: o.removed, basket: o.items.map((it) => it.text) }),
+  }),
+
+  basket_plan: def({
+    description:
+      '«همه یکجا»: one seller per basket item, as many items as possible in one mall (then the nearest seller for the rest), as a visit plan. `items` replaces the basket (the lines of a multi-item request); `location_text` moves the search like set_context; `verify: true` follows up all picked sellers (simulated, awaited) and re-plans items that are out of stock.',
+    input: z.object({
+      items: z.array(z.string().min(2).max(80)).min(2).max(8).optional(),
+      location_text: z.string().max(80).optional(),
+      verify: z.boolean().optional(),
+    }),
+    run: async (i, ctx): Promise<BasketPlanOutput> => {
+      const st = ctx.state;
+      if (i.location_text) await TOOL_DEFS.set_context.run({ location_text: i.location_text }, ctx);
+      if (i.items?.length) st.basket = await resolveBasketItems(i.items.map((t) => t.trim()), st);
+      return basketPlan({ state: st, sessionId: ctx.sessionId, now: ctx.now, verify: i.verify });
+    },
+    toModel: (o) => ({
+      summary: o.summary,
+      location: o.location,
+      coverage: o.coverage,
+      items: o.items.map((it) => ({
+        item: it.text,
+        shop: it.pick?.shop_name ?? null,
+        mall: it.pick?.mall?.name ?? null,
+        price: it.pick?.price ?? null,
+        followup: it.pick?.followup_status ?? null,
+        replaced_out_of_stock: it.pick?.replaced ?? null,
+      })),
+      plan_minutes: o.plan?.total_minutes ?? null,
+      verified: o.verified,
     }),
   }),
 

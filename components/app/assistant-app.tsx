@@ -20,6 +20,7 @@ import { ContextBar } from './context-bar';
 import { Hero } from './hero';
 import { MessageList } from './message-list';
 import { Composer } from './composer';
+import { BasketBar } from './basket-bar';
 import { SuggestedActions } from './suggested-actions';
 import { MapColumn, MapPanel } from './map-panel';
 import { LoginScreen } from './login-screen';
@@ -229,6 +230,7 @@ function Workspace({ chatId, initialMessages, me, chats, onNewChat, onOpenChat, 
           </main>
           <div className="border-t bg-background/95 pb-[env(safe-area-inset-bottom)] backdrop-blur supports-[backdrop-filter]:bg-background/85">
             <div className="mx-auto w-full max-w-3xl">
+              <BasketBar />
               <SuggestedActions items={suggestions} />
               <Composer onStop={stop} />
             </div>

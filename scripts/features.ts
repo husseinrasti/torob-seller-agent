@@ -11,6 +11,9 @@ import { bargainingCard } from '../lib/search/market';
 import { findSellers } from '../lib/search/sellers';
 import { mallView } from '../lib/search/mall-view';
 import { runTool } from '../lib/agent/tools';
+import { randomUUID } from 'node:crypto';
+import type { BasketPlanOutput } from '../lib/plan/basket-service';
+import { detectMission } from '../lib/agent/mission/extract';
 import { compareFloors } from '../lib/data/mall-floors';
 
 process.env.LLM_PROVIDER = 'offline';
@@ -91,11 +94,30 @@ async function f2() {
   check('F2 nearby malls with seller counts', out.nearby_malls.length > 0 && out.nearby_malls.every((m) => m.distance_m <= 600), out.nearby_malls.map((m) => `${m.name} ${m.distance_m}m (${m.seller_count})`).join('، '));
 }
 
+async function f3() {
+  const text = 'گوشی A17، کاور A17، گلس، پاوربانک ۲۰ هزار، همه یکجا نزدیک فردوسی';
+  const st = demoState();
+  const det = await detectMission(text, st);
+  check('F3 a «یکجا» message → 4 basket lines + the place', det.mission.items?.length === 4 && det.mission.location?.text === 'فردوسی', (det.mission.items ?? []).join(' | '));
+  const ctx = { sessionId: randomUUID(), state: st, now: appNow(DEMO_TIME) };
+  const t0 = Date.now();
+  const out = (await runTool('basket_plan', { items: det.mission.items, location_text: det.mission.location?.text }, ctx)) as BasketPlanOutput;
+  const where = out.items.map((it) => `${it.text} → ${it.pick ? `${it.pick.shop_name}${it.pick.mall?.name ? ` (${it.pick.mall.name})` : ''}` : '—'}`).join(' · ');
+  check('F3 ≥ 2 items bought in one mall (greedy set cover)', out.coverage.items_in_one_mall >= 2, `${out.summary} — ${where} (${((Date.now() - t0) / 1000).toFixed(1)} s)`);
+  const titles = out.items.map((it) => it.pick?.product_title ?? '—');
+  check('F3 model code stays exact; «گلس» borrows the phone\'s A17', /A17/i.test(titles[0]) && /A17/i.test(titles[1]) && /A17/i.test(titles[2]), titles.join(' | '));
+  check('F3 every picked seller lists the item near فردوسی; plan grouped by mall', Boolean(out.plan) && out.plan!.groups.some((g) => g.mall && g.steps.length >= 2) && out.items.every((it) => !it.pick || it.pick.distance_m <= 3000), out.plan?.groups.map((g) => `${g.mall ?? 'جدا'}:${g.steps.length}`).join(' '));
+  const verified = (await runTool('basket_plan', { verify: true }, ctx)) as BasketPlanOutput;
+  const statuses = verified.items.map((it) => it.pick?.followup_status ?? '—');
+  check('F3 «پیگیری همه»: follow-ups awaited, out-of-stock items re-planned', verified.verified && statuses.every((s) => s !== 'pending' && s !== 'contacting'), `${statuses.join(', ')}${verified.items.some((it) => it.pick?.replaced) ? ' · replaced' : ''}`);
+}
+
 async function main() {
   await f11();
   await f8();
   await f5();
   await f2();
+  await f3();
   let failed = 0;
   for (const [name, ok, detail] of checks) {
     if (!ok) failed++;

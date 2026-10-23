@@ -306,6 +306,23 @@ async function main() {
   check('F2. mall view: ≥ 3 floor tabs, sellers first, «همسایه جایگزین» badged', floorTabs >= 3 && order[0] === 0 && order.every((x, i) => i === 0 || order[i - 1] <= x) && (await mallView.locator('[data-neighbour]').count()) > 0, `${floorTabs} floors · ${kinds.filter((k) => k === 'seller').length} sellers on this floor`);
   check('F2. three-field prices, floor follow-up, hours line, nearby malls', (await mallView.locator('[data-floor-followup]').count()) === 1 && /آخرین تغییر قیمت/.test(await mallView.innerText()) && (await mallView.locator('[data-mall-hours]').innerText()).length > 10 && (await mallView.locator('[data-nearby-mall]').count()) > 0);
   await snapAs(page, '29-mall-view', '[data-mall-view]');
+
+  // F3) «… همه یکجا نزدیک فردوسی»: basket lines → one seller per item, ≥ 2 in one mall → the visit plan → «پیگیری همه»
+  await page.locator('textarea').fill('گوشی A17، کاور A17، گلس، پاوربانک ۲۰ هزار، همه یکجا نزدیک فردوسی');
+  await page.locator('textarea').press('Enter');
+  const basket = page.locator('[data-basket-plan]').last();
+  await basket.waitFor({ timeout: 60_000 });
+  await waitIdle(page);
+  const inOneMall = Number(await basket.getAttribute('data-in-one-mall'));
+  check('F3. basket: ≥ 2 items in one mall, grouped plan, BasketBar', inOneMall >= 2 && (await basket.locator('[data-basket-stop]').count()) >= 1 && (await basket.locator('section[data-plan-id]').count()) === 1 && (await page.locator('[data-basket-bar]').isVisible()), `${inOneMall} in one mall · ${(await basket.locator('header').first().innerText()).replace(/\n/g, ' / ')}`);
+  await snapAs(page, '30-basket-plan', '[data-basket-plan]');
+  await basket.locator('[data-basket-verify]').click();
+  const verifiedPlan = page.locator('[data-basket-plan]').last();
+  await page.waitForFunction(() => document.querySelectorAll('[data-basket-plan]').length >= 2, null, { timeout: 60_000 });
+  await waitIdle(page);
+  const vText = await verifiedPlan.innerText();
+  check('F3. «پیگیری همه» awaited: every item has an answer, simulation disclaimer', !/در حال پیگیری|تأیید نشده/.test(vText.split('برنامه مراجعه')[0]) && /شبیه‌سازی‌شده/.test(vText));
+  await snapAs(page, '31-basket-verified', '[data-basket-plan]');
   if (upto < 8) return finish();
 
   // 8) memory + history: a new chat greets by name, remembers the search and resumes the previous chat

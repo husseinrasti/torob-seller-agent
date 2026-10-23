@@ -9,6 +9,9 @@ import type { Intent } from '../search/score';
 
 export type FollowupStatus = 'pending' | 'contacting' | 'confirmed' | 'out_of_stock' | 'price_changed' | 'no_answer';
 
+/** One line of a «یکجا» basket (F3): the user's words and the products they matched. */
+export type BasketItem = { id: string; text: string; title: string | null; product_ids: string[] };
+
 export type SessionState = {
   need?: string;
   budget?: { min?: number; max?: number };
@@ -37,6 +40,8 @@ export type SessionState = {
   /** «الان توی پاساژم»: location is a mall centroid, radius 300 m (F2) */
   mode?: 'in_mall';
   mall?: { key: string; name: string };
+  /** «گوشی + کاور + گلس یکجا» (F3) */
+  basket?: BasketItem[];
 };
 
 export const DEFAULT_STATE: SessionState = {
@@ -80,6 +85,8 @@ export const StatePatchSchema = z
     shortlist: z.array(z.string().max(64)).max(20),
     demoTime: z.string().max(32).nullable(),
     budget: z.object({ min: z.number().optional(), max: z.number().optional() }).nullable(),
+    /** basket item ids to keep (× on a BasketBar chip; [] empties the basket) */
+    basket: z.array(z.string().max(16)).max(12),
   })
   .partial();
 
@@ -98,6 +105,7 @@ export function applyPatch(state: SessionState, patch: StatePatch): SessionState
   if (patch.shortlist) next.shortlist = patch.shortlist;
   if (patch.chosenProduct !== undefined) next.chosenProduct = patch.chosenProduct ?? undefined;
   if (patch.demoTime !== undefined) next.demoTime = patch.demoTime ?? undefined;
+  if (patch.basket) next.basket = (state.basket ?? []).filter((it) => patch.basket!.includes(it.id));
   if (patch.budget !== undefined) {
     next.budget = patch.budget ?? undefined;
     next.filters = { ...next.filters, max_price: patch.budget?.max ?? undefined };
@@ -210,5 +218,6 @@ export function stateForPrompt(s: SessionState, extra: { productTitle?: string }
     `followups: ${Object.entries(s.followups).map(([o, st]) => `${o}=${st}`).join(', ') || 'none'}`,
     `checklist_offered: ${s.checklistOffered ? 'yes' : 'no'}`,
     `mode: ${s.mode === 'in_mall' && s.mall ? `in_mall «${s.mall.name}» (mall_key=${s.mall.key})` : 'normal'}`,
+    `basket: ${s.basket?.length ? s.basket.map((it) => `«${it.text}» (id=${it.id})`).join('، ') : '—'}`,
   ].join('\n');
 }

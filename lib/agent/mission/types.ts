@@ -19,6 +19,8 @@ export type Mission = {
   intent: Intent;
   /** 'call' only when the user said تماس/زنگ */
   channel: 'message' | 'call';
+  /** «گوشی A17، کاور A17، گلس، همه یکجا» → one line per item (F3 basket) */
+  items?: string[];
 };
 
 export type MissionGoal = 'find' | 'where' | 'conditions' | 'verify' | 'plan' | 'compare';

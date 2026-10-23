@@ -100,7 +100,11 @@ export async function POST(req: Request) {
   if (!action && body?.mode === 'auto' && last?.role === 'user') {
     const text = textOf(last);
     const det = text ? await detectMission(text, ctx.state).catch(() => null) : null;
-    if (det?.mission_like) action = { tool: 'run_mission', input: { text } };
+    // «گوشی + کاور + گلس یکجا» → the basket: one seller per item, as many as possible in one mall
+    if (det?.mission.items && det.mission.items.length >= 2) {
+      const m = det.mission;
+      action = { tool: 'basket_plan', input: { items: m.items, ...(m.location?.text ? { location_text: m.location.text } : {}), ...(m.verify.contact_sellers || m.verify.availability ? { verify: true } : {}) } };
+    } else if (det?.mission_like) action = { tool: 'run_mission', input: { text } };
     // «این گوشی NFC داره؟» about the product on screen → answered from its specs, never from memory
     else if (text && (ctx.state.chosenProduct || ctx.state.candidates.length) && isSpecQuestion(text)) action = { tool: 'product_specs_qa', input: { question: text } };
     // «چرا این اول شد؟» about the list on screen → its score breakdown, not the model's guess

@@ -129,6 +129,16 @@ function summarize(toolName: string, v: Json | null, error?: string): string {
       return `${String(v.answer)}.`;
     case 'best_time_to_visit':
       return `${String(v.sentence)}.`;
+    case 'basket_plan': {
+      const items = (v.items as Json[] | undefined) ?? [];
+      const swapped = items.filter((it) => it.replaced_out_of_stock).map((it) => `«${String(it.item)}»`);
+      return `${String(v.summary)}.${v.verified ? ` موجودی از فروشنده‌ها پرسیده شد${swapped.length ? `؛ برای ${swapped.join('، ')} فروشنده‌ی دیگری گذاشتم چون موجود نداشت` : ''}.` : ' برای اطمینان «پیگیری همه» را بزنید.'}`;
+    }
+    case 'basket_add':
+    case 'basket_remove': {
+      const basket = (v.basket as Array<Json | string> | undefined) ?? [];
+      return `سبد الان ${toFaDigits(basket.length)} قلم دارد${basket.length >= 2 ? '؛ «برنامه‌ی یکجا» را بزنید' : ''}.`;
+    }
     case 'mall_view': {
       const floors = ((v.floors as Json[] | undefined) ?? []).filter((f) => Number(f.sellers) > 0).map((f) => `${String(f.floor)} (${toFaDigits(Number(f.sellers))})`);
       const head = v.product

@@ -287,3 +287,16 @@ describe('chip edits', () => {
     expect(applyOverrides(m, { drop: ['budget'] }).budget).toBeNull();
   });
 });
+
+describe('parseMission — basket lines (F3)', () => {
+  it('«…، همه یکجا نزدیک فردوسی» → four items, the place kept as the location', () => {
+    const d = parseMission('گوشی A17، کاور A17، گلس، پاوربانک ۲۰ هزار، همه یکجا نزدیک فردوسی', { index });
+    expect(d.mission.items).toEqual(['گوشی A17', 'کاور A17', 'گلس', 'پاوربانک ۲۰ هزار']);
+    expect(d.mission.location?.text).toBe('فردوسی');
+  });
+
+  it('«گوشی + کاور + گلس یکجا» → three items; a single search has none', () => {
+    expect(parseMission('گوشی + کاور + گلس یکجا', { index }).mission.items).toEqual(['گوشی', 'کاور', 'گلس']);
+    expect(parseMission('گوشی سامسونگ تا ۶۰ میلیون نزدیک من', { index }).mission.items).toBeUndefined();
+  });
+});

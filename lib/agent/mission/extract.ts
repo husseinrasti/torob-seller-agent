@@ -8,6 +8,7 @@ import { q } from '../../db/client';
 import type { SessionState } from '../state';
 import { placeIndex, scanLocation, type LocationMatch, type PlaceIndex } from './geocode';
 import type { Mission, MissionGoal } from './types';
+import { looksLikeBasket, splitBasketItems } from '../../plan/basket';
 
 /**
  * Mission extraction: deterministic rules first (budget, place, conditions, delegated checks — reliable
@@ -139,6 +140,18 @@ export function parseMission(text: string, opts: { index: PlaceIndex; chosen?: {
     const query = words.join(' ').trim();
     // «A17» or «پاوربانک ۲۰ هزار» are products; leftovers like a lone number are not
     if (query.length >= 2 && /\p{L}/u.test(query)) m.product = { query, ...(brand ? { brand } : {}) };
+  }
+  // «گوشی A17، کاور A17، گلس، همه یکجا نزدیک فردوسی» → basket lines (the place is dropped from its line)
+  if (looksLikeBasket(text)) {
+    const items = splitBasketItems(text)
+      .map((part) => {
+        const loc = scanLocation(part, opts.index);
+        if (!loc) return part;
+        const t = normalizeForSearch(part).split(' ').filter(Boolean);
+        return [...t.slice(0, loc.span[0]), ...t.slice(loc.span[1])].filter((w) => !STOP.has(w) && w !== 'همه').join(' ');
+      })
+      .filter((s) => s.length >= 2 && /\p{L}/u.test(s) && !NEARBY_RE.test(s));
+    if (items.length >= 2) m.items = items;
   }
   return { mission: m, goals: missionGoals(m), location, nearby };
 }
