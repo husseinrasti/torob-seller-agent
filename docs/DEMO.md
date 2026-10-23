@@ -9,7 +9,7 @@ Goal: from «گوشی سامسونگ تا ۶۰ میلیون» to a confirmed, ma
 3. With an LLM key the agent speaks freely; without one the header shows «حالت آفلاین» and the same flow runs with the rule‑based model (all numbers still come from tools).
 4. `SIM_SALT=hamrah-40` gives the mixed outcomes below for the top‑3 sellers.
 
-The whole flow is automated by `pnpm scenario <app-url>` (27 checks; `--desktop` for 1440×900, `--dark` for dark mode); the screenshots below come from it (desktop ones in `docs/screenshots/desktop/`).
+The whole flow is automated by `pnpm scenario <app-url>` (28 checks; `--desktop` for 1440×900, `--dark` for dark mode); the screenshots below come from it (desktop ones in `docs/screenshots/desktop/`).
 
 ## Script
 
@@ -19,7 +19,7 @@ The whole flow is automated by `pnpm scenario <app-url>` (27 checks; `--desktop`
 | 1 | Tap **«گوشی سامسونگ تا ۶۰ میلیون نزدیک من»** | 4 product cards: A17 128/4 (from ۵۳٬۹۰۰٬۰۰۰ · ۲۶ فروشنده), A07 64/4, A07 128/6, A17 128/6 flagged «کمی بالاتر از بودجه», each with a «چرا» line | Budget parsed deterministically; reasons are templated from data, not invented | `03-products.png` |
 | 2 | Tap **«مقایسه»** on the first two → **«مقایسه کن»** → **«انتخاب»** under A17 128/4 | Compare table (differing specs + price/seller rows), then the seller list | Step 1 → step 2 without typing | `04-compare.png` |
 | 3 | — | «۲۴ فروشنده در شعاع ۱ کیلومتر», cluster chips (چارسو ۶، علاءالدین ۶، بازار موبایل ایران ۴، بزرگمهر ۲، خانه موبایل ۲); cards with mall · floor · unit | Mall navigation parsed from free‑text addresses | `05-sellers.png`, `06-seller-cards.png` |
-| 3b | Tap **«نقشه»** (desktop: the map column) | Radius circle, **every shop of the area** as a dot (teal: lists the product · amber: activity category only · gray: other shops), the seller list as numbered pins; tap pin **«۱»** → shop sheet: address with mall/floor/unit, today's hours, the chosen product's offer with «پیگیری» / «به برنامه», score shares, other products | Any shop on the map can be opened and acted on | `07-map.png`, `08-map-shop-details.png` |
+| 3b | Tap **«نقشه»** (desktop: the map column) | Radius circle, **every shop of the area** with an icon for its type (teal: lists products · gray: no listings · amber bubble: only the activity category matches), shops of one building grouped into pills with a shop icon and their count, the seller list as numbered pins; type chips with counts above the map → tap **«موبایل و لوازم جانبی»** and back to «همه»; tap pin **«۱»** → shop sheet: type, address with mall/floor/unit, today's hours, the chosen product's offer with «پیگیری» / «به برنامه», score shares, other products. Tapping a pill zooms in; inside a mall it lists the shops | Any shop on the map can be found by type, opened and acted on | `07-map.png`, `07b-map-type-filter.png`, `08-map-shop-details.png` |
 | 3c | Tap **«باز الان»**, then the radius chip → **«۵۰۰ متر»** | List shrinks to 18 in place — no chat round trip | ContextBar re-filters without the LLM | `09-sellers-open-500m.png` |
 | 3d | Tap **«قسطی»** | 0 results + banner «حذف فیلتر قسطی (+۱۸)» → tap it | Relaxation hints; only 128 shops declare installments | `10-installment-relaxation.png` |
 | 4 | Point at the first card, then type **«چرا این اول شد؟»** | Three separate fields: قیمت ثبت‌شده · آخرین تغییر قیمت (green/amber/red) · موجودی «تأیید نشده»; answer from `why` + `score_breakdown` | Transparency rules of the challenge | `11-why-first.png` |
@@ -31,7 +31,7 @@ The whole flow is automated by `pnpm scenario <app-url>` (27 checks; `--desktop`
 
 ## Talking points (30 s wrap‑up)
 
-- **Product/UX:** four steps, chat + controls, mall → floor → unit, open‑at‑arrival, Persian everywhere; phone and desktop layouts; every shop selectable on the map.
+- **Product/UX:** four steps, chat + controls, mall → floor → unit, open‑at‑arrival, Persian everywhere; phone and desktop layouts; every shop on the map by type, filterable and selectable.
 - **Transparency:** listed price ≠ price age ≠ confirmed stock; unknown stays unknown; category‑only shops are separate.
 - **Intelligence:** tool‑calling agent with explainable ranking, proactive follow‑ups and alternatives, memory across chats; graceful offline fallback.
 - **Engineering/deploy:** one `docker compose up -d`, auto‑seed in ~30 s, healthz, CI, golden + scenario tests.

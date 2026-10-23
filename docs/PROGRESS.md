@@ -130,10 +130,24 @@ Acceptance:
 - `pnpm scenario` with the live model (OpenAI `gpt-5.4-mini`, demo time Sunday 16:00): **27/27** on 390 px, **27/27** with `--desktop` (1440×900), and **27/27** against the rebuilt Docker image through Caddy (`http://localhost:8088`, 52 s). Screenshots: `docs/screenshots/` and `docs/screenshots/desktop/`.
 - `pnpm llm-check`: openai (`gpt-5.4-mini`) OK in 2.6 s, google (`gemini-3.1-flash-lite`) OK in 1.1 s, openrouter (`openai/gpt-4.1-mini`) OK in 2.1 s.
 
+## Post-v1 — Shop types on the map ✅
+
+Request (owner, 2026-10-23): shops were plain dots that did not read as shops until hovered; show an icon, different icons per shop type, and group/filter by type.
+
+Done:
+- 20 shop types from the activity categories (rules + majority vote, fallback to listed products, «فعالیت ثبت نشده» when the dataset has neither), cached per process; `/api/shops/near` returns the type and mall; the shop sheet shows the type.
+- Map: a badge per shop with its type icon (colour = lists products / no listings / category-only), cluster pills «shop icon + Persian count» with an amber category-only bubble, tap to zoom or — inside one building — a list of its shops; type chips with counts; collapsible legend on phones.
+- Unit tests for the type rules (incl. substring traps such as «تهویه» ⊃ «هویه», «آداپتور» ⊃ «پتو»).
+
+Acceptance:
+- `pnpm typecheck && pnpm lint && pnpm test` green (142 unit tests).
+- `pnpm scenario`: **28/28** on 390 px, **28/28** with `--desktop` and **28/28** against the rebuilt Docker image (`http://localhost:8088`) (new checks: type chips with counts, a chip filters the map, the shop sheet shows the type). Screenshots `07-map.png`, `07b-map-type-filter.png` (phone and desktop).
+- Around the default location (1 km): 2,692 shops besides the sellers — mobile 494, CCTV 187, tools 177, audio/video 166, …, 724 «فعالیت ثبت نشده».
+
 ## Final status
 
-- `pnpm typecheck && pnpm lint && pnpm test && pnpm golden` → green (107 unit tests; golden 15/15 queries + 10/10 seller checks).
-- Demo scenario §13 steps 1–7 plus history/memory (step 8): `pnpm scenario` 27/27 (phone, desktop and Docker), `?demo_time=` and `/demo-reset?name=` supported.
+- `pnpm typecheck && pnpm lint && pnpm test && pnpm golden` → green (142 unit tests; golden 15/15 queries + 10/10 seller checks).
+- Demo scenario §13 steps 1–7 plus history/memory (step 8): `pnpm scenario` 28/28 (phone, desktop and Docker), `?demo_time=` and `/demo-reset?name=` supported.
 - All three LLM providers verified live on 2026-10-23 (`pnpm llm-check`: 3 ok).
 - CI: GitHub Actions (install → typecheck → lint → test) on every push.
 - Parsed malls for 4,088 shops (after parser refinements in M1).

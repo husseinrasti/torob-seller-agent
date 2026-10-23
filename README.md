@@ -32,7 +32,7 @@
 - **Sign in with just a name** («اسمت چیه؟») — chats are saved per user. There is no password: whoever types the same name opens the same history (a deliberate hackathon trade‑off, [DECISIONS #43](docs/DECISIONS.md)).
 - **Chat history.** Previous chats are listed with their title and last activity (sidebar on desktop, sheet on mobile); opening one brings back every card — seller list, follow‑up board with its outcomes, visit plan — and continues the conversation. Each chat has its own URL (`/?c=<id>`), so back/forward and reload work.
 - **Memory across chats.** The usual location and radius, recent searches and recently chosen products are remembered per user. A new chat starts at the remembered location, greets by name and offers «از جایی که مانده بودیم» (resume the last chat or repeat a recent search); the agent gets the same facts as a short prompt block. «پاک کردن» clears it.
-- **Every shop on the map.** All shops within the radius are drawn (teal: lists the chosen product · amber: activity category only · gray: other shops), the current seller list as numbered pins, names on hover. Tapping any shop opens its sheet: address with mall/floor/unit, today's hours, conditions, the chosen product's offer with «پیگیری» / «به برنامه», the score breakdown (for shops in the seller list) and the shop's other products.
+- **Every shop on the map, by shop type.** All shops within the radius are drawn with an icon for their type (mobile, computer, audio/video, CCTV, electronic parts, electrical & lighting, tools, appliances, apparel, beauty, medical, auto… — derived from the ~4,000 activity categories, «فعالیت ثبت نشده» when the dataset has none) and a colour for what Torob knows (teal: lists products · gray: no listings · amber: only the activity category matches the chosen product). Chips above the map filter by type with counts. Shops that share a building (up to 45 at one point in the bazaar) are grouped into a pill with a shop icon and the count that zooms in on tap and, inside a mall, lists its shops. The current seller list stays as numbered pins. Tapping any shop opens its sheet: type, address with mall/floor/unit, today's hours, conditions, the chosen product's offer with «پیگیری» / «به برنامه», the score breakdown (for shops in the seller list) and the shop's other products.
 
 ### Transparency rules (visible on every seller card)
 - **Three separate fields, three visual treatments:** «قیمت ثبت‌شده» (listed price) · «آخرین تغییر قیمت» (green ≤ 7 d, amber ≤ 30 d, red older, gray unknown) · «موجودی» (stays «تأیید نشده» until a follow‑up confirms it).
@@ -44,11 +44,11 @@
 
 | Criterion (pts) | Where it shows |
 |---|---|
-| **Product (75)** | All four steps end to end; mall → floor → unit navigation from free‑text addresses (4,088 shops parsed); price‑freshness and suspicious‑price flags; category‑only shops separated; follow‑ups with automatic alternatives; visit plan with open‑at‑arrival warnings; shareable plan; checklist; every shop of the area selectable on the map; per‑user chat history with resume. |
+| **Product (75)** | All four steps end to end; mall → floor → unit navigation from free‑text addresses (4,088 shops parsed); price‑freshness and suspicious‑price flags; category‑only shops separated; follow‑ups with automatic alternatives; visit plan with open‑at‑arrival warnings; shareable plan; checklist; every shop of the area on the map by type, filterable and selectable; per‑user chat history with resume. |
 | **UX (75)** | Mobile‑first RTL (390 px) **and** a desktop layout (≥ 1024 px: history · chat · live map); Vazirmatn, Persian digits everywhere; chat **plus** structured controls: sticky ContextBar (location, radius, price cap, conditions, intent) re‑filters the list **instantly without the LLM**; generative UI cards; skeletons; empty states with one tappable fix; 44 px targets; dark mode; Lighthouse mobile **92 / 100 / 100** (M5 build). |
 | **Intelligence (50)** | Vercel AI SDK v7 agent with 10 tools; deterministic‑first category routing (product votes + trigram) with LLM refinement; Persian budget parser; explainable seller score and «چرا این اول شد؟» grounded in `score_breakdown`; proactive rules (stale price → follow up, out of stock → alternatives, confirmed → plan); memory across chats (usual location/radius, recent searches and products); automatic fallback to a rule‑based model when the provider fails. |
 | **Deploy (40)** | `docker compose up -d` → PostgreSQL 16, app (Next standalone, non‑root, healthcheck), Caddy (automatic HTTPS); migrations + **auto‑seed** on first boot (~30 s); `/api/healthz`; exact VPS commands in [docs/DEPLOY.md](docs/DEPLOY.md). |
-| **Engineering (40)** | TypeScript end to end, Drizzle schema & migrations, COPY‑based seed with 4 streaming passes, pure tested modules (107 unit tests), golden search suite, Playwright scenario (27 checks on phone and desktop viewports), CI (typecheck · lint · test), decisions log ([docs/DECISIONS.md](docs/DECISIONS.md)). |
+| **Engineering (40)** | TypeScript end to end, Drizzle schema & migrations, COPY‑based seed with 4 streaming passes, pure tested modules (142 unit tests), golden search suite, Playwright scenario (28 checks on phone and desktop viewports), CI (typecheck · lint · test), decisions log ([docs/DECISIONS.md](docs/DECISIONS.md)). |
 | **Dataset (20)** | Uses all three CSVs: Persian normalization (ی/ک, digits, ZWNJ), mall/floor/unit parser with spelling unification (علاالدین/علاءالدین/علائدین…), hours with `declared/closed/unsupported`, price age & suspicious‑price flags vs product median, payment providers with in‑person vs declared channel, warranty parsing, brand inference for the 75 % of products without a brand. |
 
 ## Architecture
@@ -58,7 +58,7 @@ flowchart LR
   subgraph Browser["Web — phone and desktop (Next.js, RTL)"]
     UI["Chat + generative cards<br/>ContextBar · SellerList · FollowupBoard · TripPlan"]
     HIST["Name sign-in · chat history"]
-    MAP["MapLibre + OSM tiles<br/>all shops + numbered sellers"]
+    MAP["MapLibre + OSM tiles<br/>shop-type icons · clusters · numbered sellers"]
   end
   subgraph App["Next.js 15 route handlers"]
     CHAT["/api/chat<br/>AI SDK v7 streamText + tools<br/>+ user memory in the prompt"]
@@ -165,12 +165,12 @@ app/            page, /plan/[id], /demo-reset, api/{chat,session,sellers,followu
 components/     app shell (login, history, ContextBar, sheets, composer, map column) and cards (products, compare, sellers, follow-ups, alternatives, plan, checklist)
 lib/auth.ts     name-only sign-in (cookie → users row), memory save
 lib/fa          Persian normalization, digits, formatting
-lib/data        mall/floor/unit parser, opening hours, price quality, payments, warranty
+lib/data        mall/floor/unit parser, opening hours, price quality, payments, warranty, shop types from activity categories
 lib/search      query parsing, category routing, product ranking, sellers + score, alternatives, places, shops near a point
 lib/agent       tools, system prompt, chats (session state + messages), memory, suggestions, offline model, checklist
 lib/sim         seller simulator, persona transcripts, follow-up service
 lib/plan        visit planner
-scripts         seed, golden, scenario, smoke, llm-check, tune-salt
+scripts         seed, golden, scenario, smoke, llm-check, tune-salt, shop-types-report
 docs            spec, run plan, DECISIONS, PROGRESS, DEPLOY, DEMO, screenshots
 ```
 
