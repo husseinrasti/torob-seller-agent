@@ -19,11 +19,13 @@ import { q } from '@/lib/db/client';
 import type { ActionMetadata } from '@/lib/agent/types';
 import { detectMission } from '@/lib/agent/mission/extract';
 import { isSpecQuestion } from '@/lib/search/spec-qa';
+import { placeIndex, scanLocation } from '@/lib/agent/mission/geocode';
 
 export const dynamic = 'force-dynamic';
 export const maxDuration = 60;
 
 const MAX_HISTORY = 16;
+const IN_MALL = /(?:^|\s)(?:الان|الآن|اکنون|همین الان)?\s*(?:توی|تو|داخل|درون)\s+(?:پاساژ|مرکز خرید|بازار)|(?:الان|الآن)\s+(?:توی|تو|داخل)\s+\S+م(?:\s|$|[.،!؟?])|(?:پاساژ|مرکز خرید)\s+\S+(?:م|ام|هستم)(?:\s|$|[.،!؟?])/u;
 
 function persianError(err: unknown): string {
   const msg = err instanceof Error ? err.message : String(err);
@@ -103,6 +105,11 @@ export async function POST(req: Request) {
     else if (text && (ctx.state.chosenProduct || ctx.state.candidates.length) && isSpecQuestion(text)) action = { tool: 'product_specs_qa', input: { question: text } };
     // «چرا این اول شد؟» about the list on screen → its score breakdown, not the model's guess
     else if (text && ctx.state.chosenProduct && /چرا\s+(?:این|اون|اولی|\S+)?\s*(?:اول|رتبه|بالاتر|برتر)/u.test(text)) action = { tool: 'explain_rank', input: {} };
+    // «الان توی پاساژ علاءالدینم» → that mall floor by floor (in-mall mode)
+    else if (text && IN_MALL.test(text)) {
+      const hit = scanLocation(text, await placeIndex(), { relaxed: true });
+      if (hit?.place.kind === 'mall' && hit.place.mall_key) action = { tool: 'mall_view', input: { mall_key: hit.place.mall_key } };
+    }
   }
 
   const stream = createUIMessageStream({

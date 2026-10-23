@@ -4,7 +4,7 @@ import { GAZETTEER, PLACE_MARKERS, PLACE_PREFIXES, gazetteerSuggest, placeKey, t
 
 export type GeoKind = 'mall' | 'area' | 'gazetteer';
 /** A resolved place: dataset mall / dataset neighbourhood label (shop centroid) / gazetteer point. */
-export type GeoPlace = { name: string; kind: GeoKind; lat: number; lon: number; radius_m: number };
+export type GeoPlace = { name: string; kind: GeoKind; lat: number; lon: number; radius_m: number; mall_key?: string | null };
 
 type Indexed = GeoPlace & { marker: boolean };
 /** key → candidates (a mall and a neighbourhood may share a name: «بازار تجریش» / «تجریش») */
@@ -18,7 +18,7 @@ const RADIUS: Record<GeoKind, number> = { mall: 300, area: 1000, gazetteer: 1000
 const spelling = (t: string) => t.replace(/علاالدین|علائدین|علالدین/gu, 'علاءالدین').replace(/چهارسو/gu, 'چارسو');
 
 /** Index of malls, dataset labels and gazetteer names by spelling-insensitive key (dataset first). */
-export function buildPlaceIndex(places: Array<Pick<Place, 'name' | 'kind' | 'lat' | 'lon' | 'norm'>>): PlaceIndex {
+export function buildPlaceIndex(places: Array<Pick<Place, 'name' | 'kind' | 'lat' | 'lon' | 'norm'> & { mall_key?: string | null }>): PlaceIndex {
   const index: PlaceIndex = new Map();
   const add = (key: string, p: Indexed) => {
     if (!key) return;
@@ -26,7 +26,7 @@ export function buildPlaceIndex(places: Array<Pick<Place, 'name' | 'kind' | 'lat
     if (!list.some((x) => x.kind === p.kind)) list.push(p);
     index.set(key, list);
   };
-  for (const p of places.filter((x) => x.kind === 'mall')) add(placeKey(spelling(p.norm)), { name: p.name, kind: 'mall', lat: p.lat, lon: p.lon, radius_m: RADIUS.mall, marker: true });
+  for (const p of places.filter((x) => x.kind === 'mall')) add(placeKey(spelling(p.norm)), { name: p.name, kind: 'mall', lat: p.lat, lon: p.lon, radius_m: RADIUS.mall, marker: true, mall_key: p.mall_key ?? null });
   for (const p of places.filter((x) => x.kind === 'area')) {
     const key = placeKey(p.norm);
     add(key, { name: p.name, kind: 'area', lat: p.lat, lon: p.lon, radius_m: RADIUS.area, marker: COMMON_LABELS.has(key) });
@@ -65,7 +65,9 @@ export function scanLocation(text: string, index: PlaceIndex, opts: { relaxed?: 
   for (let i = 0; i < tokens.length; i++) {
     for (let w = Math.min(4, tokens.length - i); w >= 1; w--) {
       if (w <= bestLen) break;
-      const list = index.get(placeKey(tokens.slice(i, i + w).join(' ')));
+      // «علاءالدینم» / «تجریشم» («I am in …»): retry without the trailing «م»
+      const words = tokens.slice(i, i + w).join(' ');
+      const list = index.get(placeKey(words)) ?? (words.length > 4 && /م$/u.test(words) ? index.get(placeKey(words.slice(0, -1))) : undefined);
       if (!list) continue;
       const prev = tokens[i - 1];
       const prev2 = tokens[i - 2];

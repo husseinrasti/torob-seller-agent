@@ -3,7 +3,7 @@ import { normalizeForSearch } from '../fa/normalize';
 import { SQL_DISTANCE } from '../geo';
 import { GAZETTEER, placeKey, trigramSimilarity } from '../agent/mission/gazetteer';
 
-export type Place = { name: string; kind: 'area' | 'mall'; lat: number; lon: number; shops: number; norm: string };
+export type Place = { name: string; kind: 'area' | 'mall'; lat: number; lon: number; shops: number; norm: string; mall_key?: string | null };
 /** A search hit for the location sheet; gazetteer places report shops within 1 km instead of labelled shops. */
 export type PlaceHit = { name: string; kind: 'area' | 'mall' | 'gazetteer'; lat: number; lon: number; shops: number };
 
@@ -12,11 +12,11 @@ let cache: { at: number; places: Place[] } | null = null;
 /** Neighbourhood labels and malls from the dataset with their shop centroids (no external geocoder). */
 export async function loadPlaces(): Promise<Place[]> {
   if (cache && Date.now() - cache.at < 10 * 60_000) return cache.places;
-  const rows = await q<{ name: string; kind: 'area' | 'mall'; lat: number; lon: number; shops: string }>(
-    `SELECT location_label AS name, 'area' AS kind, avg(lat) AS lat, avg(lon) AS lon, count(*) AS shops
+  const rows = await q<{ name: string; kind: 'area' | 'mall'; lat: number; lon: number; shops: string; mall_key: string | null }>(
+    `SELECT location_label AS name, 'area' AS kind, avg(lat) AS lat, avg(lon) AS lon, count(*) AS shops, NULL AS mall_key
        FROM shops WHERE location_label IS NOT NULL GROUP BY location_label
      UNION ALL
-     SELECT max(mall_name) AS name, 'mall' AS kind, avg(lat) AS lat, avg(lon) AS lon, count(*) AS shops
+     SELECT max(mall_name) AS name, 'mall' AS kind, avg(lat) AS lat, avg(lon) AS lon, count(*) AS shops, mall_key
        FROM shops WHERE mall_key IS NOT NULL GROUP BY mall_key HAVING count(*) >= 3`,
   );
   const places = rows.map((r) => ({ ...r, shops: Number(r.shops), norm: normalizeForSearch(r.name.replace(/^(پاساژ|مجتمع تجاری|مجتمع|بازار|ساختمان|برج|مرکز خرید)\s+/u, '')) }));
@@ -66,7 +66,7 @@ function gazetteerShopCounts(): Promise<Map<string, number>> {
 export async function searchPlaces(text: string, limit = 8): Promise<PlaceHit[]> {
   const t = normalizeForSearch(text);
   const places = await loadPlaces();
-  const strip = ({ norm: _n, ...p }: Place): PlaceHit => (void _n, p);
+  const strip = ({ norm: _n, mall_key: _k, ...p }: Place): PlaceHit => (void _n, void _k, p);
   if (!t) return places.filter((p) => p.kind === 'area').sort((a, b) => b.shops - a.shops).slice(0, limit).map(strip);
   const dataset = places
     .filter((p) => p.norm.includes(t) || t.includes(p.norm))

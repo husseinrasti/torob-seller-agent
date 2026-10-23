@@ -34,6 +34,9 @@ export type SessionState = {
   planId?: string;
   demoTime?: string;
   checklistOffered?: boolean;
+  /** «الان توی پاساژم»: location is a mall centroid, radius 300 m (F2) */
+  mode?: 'in_mall';
+  mall?: { key: string; name: string };
 };
 
 export const DEFAULT_STATE: SessionState = {
@@ -85,7 +88,11 @@ export type StatePatch = z.infer<typeof StatePatchSchema>;
 /** Apply a validated partial update; `null` clears optional values. Filters merge key by key. */
 export function applyPatch(state: SessionState, patch: StatePatch): SessionState {
   const next: SessionState = { ...state };
-  if (patch.location) next.location = patch.location;
+  if (patch.location) {
+    next.location = patch.location;
+    delete next.mode; // a new place picked in the UI leaves in-mall mode
+    delete next.mall;
+  }
   if (patch.radius_m) next.radius_m = patch.radius_m;
   if (patch.intent) next.intent = patch.intent;
   if (patch.shortlist) next.shortlist = patch.shortlist;
@@ -202,5 +209,6 @@ export function stateForPrompt(s: SessionState, extra: { productTitle?: string }
     `shortlist (offer_ids): ${s.shortlist.join(', ') || 'none'}`,
     `followups: ${Object.entries(s.followups).map(([o, st]) => `${o}=${st}`).join(', ') || 'none'}`,
     `checklist_offered: ${s.checklistOffered ? 'yes' : 'no'}`,
+    `mode: ${s.mode === 'in_mall' && s.mall ? `in_mall «${s.mall.name}» (mall_key=${s.mall.key})` : 'normal'}`,
   ].join('\n');
 }

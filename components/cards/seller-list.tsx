@@ -1,7 +1,7 @@
 'use client';
 
 import { useEffect, useMemo, useRef, useState } from 'react';
-import { ChevronDown, Clock3, Filter, Loader2, MapPinned, Store, X } from 'lucide-react';
+import { Building2, ChevronDown, Clock3, Filter, Loader2, MapPinned, Store, X } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/components/ui/collapsible';
 import { ToggleGroup, ToggleGroupItem } from '@/components/ui/toggle-group';
@@ -144,6 +144,20 @@ export function SellerList({ output, isLatest, toolCallId }: { output: SellersOu
               </button>
             ))}
           </div>
+        )}
+        {mall && isLatest && (
+          <button
+            disabled={busy}
+            data-open-mall-view
+            onClick={() => {
+              const c = data.clusters.find((x) => x.mall_key === mall);
+              sendAction(`الان توی ${c?.mall_name ?? 'این پاساژ'} هستم؛ طبقه‌به‌طبقه نشان بده`, 'mall_view', { mall_key: mall, ...(data.product ? { product_id: data.product.product_id } : {}) });
+            }}
+            className="inline-flex h-9 w-full items-center justify-center gap-1.5 rounded-xl border border-primary/40 bg-accent/40 text-xs font-medium text-primary hover:bg-accent disabled:opacity-60"
+          >
+            <Building2 className="size-4" />
+            نمای داخل پاساژ (طبقه‌به‌طبقه)
+          </button>
         )}
         <ToggleGroup type="single" value={sort} onValueChange={(v) => v && setSort(v as Sort)} variant="outline" size="sm" className="w-full">
           <ToggleGroupItem value="score" className="h-9 flex-1 text-xs">بهترین امتیاز</ToggleGroupItem>

@@ -129,6 +129,15 @@ function summarize(toolName: string, v: Json | null, error?: string): string {
       return `${String(v.answer)}.`;
     case 'best_time_to_visit':
       return `${String(v.sentence)}.`;
+    case 'mall_view': {
+      const floors = ((v.floors as Json[] | undefined) ?? []).filter((f) => Number(f.sellers) > 0).map((f) => `${String(f.floor)} (${toFaDigits(Number(f.sellers))})`);
+      const head = v.product
+        ? Number(v.sellers_in_mall)
+          ? `در ${String(v.mall)} ${toFaDigits(Number(v.sellers_in_mall))} فروشنده این کالا را ثبت کرده‌اند: ${floors.join('، ')}؛ مغازه‌های هم‌دسته با برچسب «همسایه جایگزین» آمده‌اند.`
+          : `در ${String(v.mall)} فروشنده‌ای این کالا را ثبت نکرده؛ مغازه‌های هم‌دسته («همسایه جایگزین») را ببینید.`
+        : `${String(v.mall)}: ${toFaDigits(Number(v.shops))} مغازه، طبقه‌به‌طبقه.`;
+      return `${head} ${String(v.hours)}.`;
+    }
     case 'run_mission': {
       if (v.clarify) return String(v.clarify);
       const rec = v.recommendation as Json | null;

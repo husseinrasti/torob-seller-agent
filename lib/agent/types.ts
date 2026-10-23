@@ -12,6 +12,7 @@ import type { SpecAnswerOutput } from './spec-qa';
 import type { RankExplainOutput } from './tools';
 import type { SellerMessageOutput } from '../sim/seller-message';
 import type { BargainOutput } from '../search/market';
+import type { MallViewOutput } from '../search/mall-view';
 
 export type ClarifyOutput = { ui: 'clarify'; question: string; chips: string[] };
 
@@ -69,6 +70,7 @@ export type ToolOutput =
   | RankExplainOutput
   | SellerMessageOutput
   | BargainOutput
+  | MallViewOutput
   | ErrorOutput;
 
 /** Message metadata used by UI actions: run `tool` with `input` right away, then let the agent comment. */

@@ -12,6 +12,7 @@ import { SpecAnswerCard } from './spec-answer';
 import { RankExplainCard } from './rank-explain';
 import { SellerMessageCard } from './seller-message';
 import { BargainCard } from './bargain';
+import { MallViewCard } from './mall-view';
 
 /** Tool outputs other than the core four: shop details, follow-ups, alternatives, checklist, plan. */
 export function ExtraToolView({ output, toolCallId, isLastMessage }: { output: ToolOutput; toolCallId: string; isLastMessage: boolean }) {
@@ -36,6 +37,8 @@ export function ExtraToolView({ output, toolCallId, isLastMessage }: { output: T
       return <SellerMessageCard output={output} />;
     case 'bargain':
       return <BargainCard output={output} />;
+    case 'mall_view':
+      return <MallViewCard output={output} />;
     case 'shop':
       return (
         <div className="space-y-1.5 rounded-2xl border bg-card p-3 text-sm">

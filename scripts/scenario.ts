@@ -291,6 +291,21 @@ async function main() {
   await shared.screenshot({ path: `${out}/${String(++shot).padStart(2, '0')}-shared-plan.png` });
   console.log(`      📸 ${out}/${String(shot).padStart(2, '0')}-shared-plan.png`);
   await shared.close();
+
+  // F2) in-mall mode: the seller list's mall chip → «نمای داخل پاساژ» → floors, sellers first, neighbours badged
+  const mallChip = page.locator('button', { hasText: /در پاساژ علاءالدین/ }).last();
+  await mallChip.scrollIntoViewIfNeeded();
+  await mallChip.click();
+  await page.locator('[data-open-mall-view]').last().click();
+  const mallView = page.locator('[data-mall-view]').last();
+  await mallView.waitFor({ timeout: 60_000 });
+  await waitIdle(page);
+  const floorTabs = await mallView.locator('[data-floor-tab]').count();
+  const kinds = await mallView.locator('[data-mall-shop]').evaluateAll((els) => els.map((e) => e.getAttribute('data-mall-shop')));
+  const order = kinds.map((k) => (k === 'seller' ? 0 : k === 'neighbour' ? 1 : 2));
+  check('F2. mall view: ≥ 3 floor tabs, sellers first, «همسایه جایگزین» badged', floorTabs >= 3 && order[0] === 0 && order.every((x, i) => i === 0 || order[i - 1] <= x) && (await mallView.locator('[data-neighbour]').count()) > 0, `${floorTabs} floors · ${kinds.filter((k) => k === 'seller').length} sellers on this floor`);
+  check('F2. three-field prices, floor follow-up, hours line, nearby malls', (await mallView.locator('[data-floor-followup]').count()) === 1 && /آخرین تغییر قیمت/.test(await mallView.innerText()) && (await mallView.locator('[data-mall-hours]').innerText()).length > 10 && (await mallView.locator('[data-nearby-mall]').count()) > 0);
+  await snapAs(page, '29-mall-view', '[data-mall-view]');
   if (upto < 8) return finish();
 
   // 8) memory + history: a new chat greets by name, remembers the search and resumes the previous chat

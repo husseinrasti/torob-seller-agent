@@ -153,6 +153,14 @@ export async function runMission(mission: Mission, text: string, ctx: MissionCtx
       });
     }
     st.location = { lat: place.lat, lon: place.lon, label: place.name, source: 'text' };
+    // F2: a mall as the location → in-mall mode (rows grouped by floor)
+    if (place.kind === 'mall' && place.mall_key) {
+      st.mode = 'in_mall';
+      st.mall = { key: place.mall_key, name: place.name };
+    } else {
+      delete st.mode;
+      delete st.mall;
+    }
     understood = understoodOf(m, place.name);
     steps[0].detail = understood.map((u) => u.label).join('، ');
     set('locate', { status: 'done', detail: `${place.name} پیدا شد` });
@@ -160,7 +168,13 @@ export async function runMission(mission: Mission, text: string, ctx: MissionCtx
     set('locate', { status: 'done', detail: `محل فعلی: ${st.location.label}` });
   }
   const requested = m.location?.radius_m ?? (place ? place.radius_m : st.radius_m);
-  const location = { label: st.location.label, lat: st.location.lat, lon: st.location.lon, kind: place?.kind ?? st.location.source };
+  const location = {
+    label: st.location.label,
+    lat: st.location.lat,
+    lon: st.location.lon,
+    kind: place?.kind ?? (st.mode === 'in_mall' ? 'mall' : st.location.source),
+    ...(st.mode === 'in_mall' && st.mall ? { mall_key: st.mall.key } : {}),
+  };
 
   // 2. products (band, prefer ones with ≥ 2 sellers)
   set('search', { status: 'running' });

@@ -61,7 +61,7 @@ export type MissionResult = {
   text: string;
   understood: Understood[];
   band: { min?: number; max?: number } | null;
-  location: { label: string; lat: number; lon: number; kind: string };
+  location: { label: string; lat: number; lon: number; kind: string; mall_key?: string };
   coverage: { requested_radius_m: number; used_radius_m: number; sellers_in_requested_radius: number; tried: Array<{ radius_m: number; sellers: number }>; note?: string };
   rows: MissionRow[];
   total_sellers: number;

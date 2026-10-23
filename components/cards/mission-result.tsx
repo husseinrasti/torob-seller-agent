@@ -4,6 +4,7 @@ import { useEffect, useMemo, useRef, useState } from 'react';
 import { Info, MapPinned, Sparkles, ThumbsUp, TriangleAlert, X } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { faText, formatDistance, formatToman } from '@/lib/fa/format';
+import { toFaDigits } from '@/lib/fa/digits';
 import type { FollowupItem } from '@/lib/sim/followups';
 import type { MissionResult, MissionRow, Understood, Verdict } from '@/lib/agent/mission/types';
 import { effectivePrice, noRecommendationNote, pickRecommendation, verdictFor } from '@/lib/agent/mission/verdict';
@@ -14,6 +15,7 @@ import { AvailabilityBadge, FreshnessBadge, OpenDot } from './badges';
 import { ShopDetailsSheet } from './shop-details-sheet';
 import { TripPlan } from './trip-plan';
 import { VisitTimeCard } from './visit-time';
+import { floorSections } from '@/lib/data/mall-floors';
 
 const pendingish = (s?: string) => s === 'pending' || s === 'contacting';
 
@@ -123,6 +125,9 @@ export function MissionResultCard({ output, toolCallId }: { output: MissionResul
   };
   const widened = output.coverage.used_radius_m > output.coverage.requested_radius_m;
   const recRow = recommendation && rows.find((r) => r.offer_id === recommendation.offer_id);
+  // F2: a mission in a mall lists its sellers floor by floor
+  const mallKey = output.location.kind === 'mall' ? output.location.mall_key : undefined;
+  const sections = mallKey ? floorSections(rows, mallKey) : [{ key: 'all', title: '', rows }];
 
   return (
     <section data-mission-result className="@container overflow-hidden rounded-2xl border bg-card">
@@ -210,7 +215,15 @@ export function MissionResultCard({ output, toolCallId }: { output: MissionResul
                 </tr>
               </thead>
               <tbody className="divide-y">
-                {rows.map((r) => (
+                {sections.map((sec) => [
+                  sec.title ? (
+                    <tr key={sec.key} data-floor-group className="bg-muted/30">
+                      <td colSpan={6} className="px-3 py-1.5 text-[11px] font-semibold text-primary">
+                        {sec.title} · {toFaDigits(sec.rows.length)} فروشنده
+                      </td>
+                    </tr>
+                  ) : null,
+                  ...sec.rows.map((r) => (
                   <tr key={r.offer_id} data-mission-row onClick={() => setOpen(r)} className="cursor-pointer align-top hover:bg-muted/40 [&>td]:px-3 [&>td]:py-2.5">
                     <td>
                       <p className="font-semibold">{r.shop_name}</p>
@@ -234,13 +247,20 @@ export function MissionResultCard({ output, toolCallId }: { output: MissionResul
                       <p className="text-[11px] leading-4 text-muted-foreground">{faText(r.verdict_reason)}</p>
                     </td>
                   </tr>
-                ))}
+                  )),
+                ])}
               </tbody>
             </table>
           </div>
           {/* phone: stacked rows */}
           <ul className="divide-y border-t @2xl:hidden">
-            {rows.map((r) => (
+            {sections.map((sec) => [
+              sec.title ? (
+                <li key={sec.key} data-floor-group className="bg-muted/30 px-3 py-1.5 text-[11px] font-semibold text-primary">
+                  {sec.title} · {toFaDigits(sec.rows.length)} فروشنده
+                </li>
+              ) : null,
+              ...sec.rows.map((r) => (
               <li key={r.offer_id}>
                 <button data-mission-row onClick={() => setOpen(r)} className="w-full space-y-1.5 p-3 text-start hover:bg-muted/40">
                   <div className="flex items-center justify-between gap-2">
@@ -259,7 +279,8 @@ export function MissionResultCard({ output, toolCallId }: { output: MissionResul
                   <p className="text-[11px] leading-4 text-muted-foreground">{faText(r.verdict_reason)}</p>
                 </button>
               </li>
-            ))}
+              )),
+            ])}
           </ul>
         </>
       )}

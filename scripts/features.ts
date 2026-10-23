@@ -9,6 +9,9 @@ import { specQa } from '../lib/agent/spec-qa';
 import { groundedIn, NOT_LISTED } from '../lib/search/spec-qa';
 import { bargainingCard } from '../lib/search/market';
 import { findSellers } from '../lib/search/sellers';
+import { mallView } from '../lib/search/mall-view';
+import { runTool } from '../lib/agent/tools';
+import { compareFloors } from '../lib/data/mall-floors';
 
 process.env.LLM_PROVIDER = 'offline';
 
@@ -71,10 +74,28 @@ async function f5() {
   check('F5 a pricier offer gets a target price below its price, numbers from the DB', card.target_price !== null && card.target_price < card.price && card.stats.n >= 10, `${card.shop_name}: ${card.price} → ${card.target_price} (median ${card.stats.median})`);
 }
 
+async function f2() {
+  const state = demoState();
+  const out = await mallView({ mall_key: 'علاءالدین', state, now: appNow(DEMO_TIME) });
+  const floors = out.mall.floors;
+  check('F2 علاءالدین + A17: ≥ 3 floors in floor order', floors.length >= 3 && floors.every((f, i) => i === 0 || compareFloors(floors[i - 1].floor_num, f.floor_num) < 0), floors.map((f) => f.tab).join(' → '));
+  const tiers = floors.map((f) => f.shops.map((s) => (s.has_offer ? 0 : s.same_category ? 1 : 2)));
+  check('F2 sellers first, then same-category neighbours, then the rest (every floor)', out.sellers >= 3 && tiers.every((t) => t.every((x, i) => i === 0 || t[i - 1] <= x)), `${out.sellers} sellers on ${floors.filter((f) => f.sellers).length} floors`);
+  const neighbours = floors.reduce((a, f) => a + f.neighbours, 0);
+  check('F2 same-category neighbours badged (no offer, same category)', neighbours > 0 && floors.every((f) => f.shops.every((s) => !(s.same_category && s.has_offer))), `${neighbours} neighbours`);
+  const st = demoState();
+  await runTool('set_context', { location_text: 'پاساژ علاءالدین' }, { sessionId: 'features', state: st, now: appNow(DEMO_TIME) });
+  const viaContext = st.mode === 'in_mall' && st.mall?.key === 'علاءالدین';
+  await runTool('mall_view', {}, { sessionId: 'features', state: st, now: appNow(DEMO_TIME) });
+  check('F2 in-mall mode: set_context with a mall name, then mall_view → centroid, radius 300', viaContext && st.mode === 'in_mall' && st.radius_m === 300 && st.location.label === out.mall.name, out.hours_summary);
+  check('F2 nearby malls with seller counts', out.nearby_malls.length > 0 && out.nearby_malls.every((m) => m.distance_m <= 600), out.nearby_malls.map((m) => `${m.name} ${m.distance_m}m (${m.seller_count})`).join('، '));
+}
+
 async function main() {
   await f11();
   await f8();
   await f5();
+  await f2();
   let failed = 0;
   for (const [name, ok, detail] of checks) {
     if (!ok) failed++;

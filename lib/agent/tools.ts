@@ -20,6 +20,9 @@ import { visitTime, type VisitTimeOutput } from '../search/visit-time';
 import { specProductIds, specQa, type SpecAnswerOutput } from './spec-qa';
 import { sellerMessage, type SellerMessageOutput } from '../sim/seller-message';
 import { bargainingCard, type BargainOutput } from '../search/market';
+import { mallView, type MallViewOutput } from '../search/mall-view';
+import { loadPlaces } from '../search/places';
+import { haversine } from '../geo';
 import { WEEK, visitSentence } from '../data/hours-stats';
 import { atLocalTime, FA_DAY } from '../data/hours';
 import { extractMission } from './mission/extract';
@@ -193,10 +196,17 @@ export const TOOL_DEFS = {
         if (place) {
           st.location = { lat: place.lat, lon: place.lon, label: place.name, source: 'text' };
           changes.push(`📍 ${place.name}`);
-          // a mall is a building: search right around it unless the user also gave a radius
+          // a mall is a building: search right around it unless the user also gave a radius (F2: in-mall mode)
           if (place.kind === 'mall' && !i.radius_m && st.radius_m > 500) {
             st.radius_m = place.radius_m;
             changes.push(`شعاع ${formatDistance(place.radius_m)}`);
+          }
+          if (place.kind === 'mall' && place.mall_key) {
+            st.mode = 'in_mall';
+            st.mall = { key: place.mall_key, name: place.name };
+          } else {
+            delete st.mode;
+            delete st.mall;
           }
         } else unresolved = i.location_text;
       }
@@ -246,7 +256,11 @@ export const TOOL_DEFS = {
         intent: st.intent,
         now: ctx.now,
       });
-      return { ui: 'sellers', ...res, suggested_actions: sellerSuggestions({ ui: 'sellers', ...res }, st) };
+      const suggested = sellerSuggestions({ ui: 'sellers', ...res }, st);
+      // F2: standing in (or right next to) a mall → its floor-by-floor view
+      const mall = (await loadPlaces()).find((p) => p.kind === 'mall' && p.mall_key && haversine(st.location.lat, st.location.lon, p.lat, p.lon) <= 150);
+      if (mall?.mall_key) suggested.unshift({ kind: 'action', label: `نمای داخل ${mall.name}`, text: `الان توی ${mall.name} هستم؛ طبقه‌به‌طبقه نشان بده`, tool: 'mall_view', input: { mall_key: mall.mall_key } });
+      return { ui: 'sellers', ...res, suggested_actions: suggested };
     },
     toModel: (o) => ({
       product: o.product?.title,
@@ -487,6 +501,32 @@ export const TOOL_DEFS = {
     input: z.object({ offer_id: z.string() }),
     run: async (i, ctx): Promise<BargainOutput> => bargainingCard({ offer_id: i.offer_id, state: ctx.state, now: ctx.now }),
     toModel: (o) => ({ shop: o.shop_name, price: o.price, median: o.stats.median, sellers: o.stats.n, position: o.position, delta_pct: o.delta_pct, cheaper_nearby: o.cheaper_nearby, target_price: o.target_price, fair: o.fair, talking_points: o.talking_points }),
+  }),
+
+  mall_view: def({
+    description:
+      '«الان توی پاساژم»: one mall floor by floor — sellers of the chosen product first (three-field prices), then same-category shops without an offer («همسایه جایگزین»), then the rest; opening hours of the mall and nearby malls. Sets in-mall mode (location = mall centroid, radius 300 m). mall_key defaults to the in-mall mall.',
+    input: z.object({ mall_key: z.string().optional(), product_id: z.string().optional(), category: z.string().optional() }),
+    run: async (i, ctx): Promise<MallViewOutput> => {
+      const st = ctx.state;
+      const key = i.mall_key ?? st.mall?.key;
+      if (!key) throw new Error('کدام پاساژ؟ نام پاساژ را بگویید.');
+      const out = await mallView({ mall_key: key, product_id: i.product_id, category: i.category, state: st, now: ctx.now });
+      st.location = { lat: out.mall.lat, lon: out.mall.lon, label: out.mall.name, source: 'text' };
+      st.radius_m = 300;
+      st.mode = 'in_mall';
+      st.mall = { key, name: out.mall.name };
+      return out;
+    },
+    toModel: (o) => ({
+      mall: o.mall.name,
+      shops: o.mall.shop_count,
+      product: o.product?.title ?? null,
+      sellers_in_mall: o.sellers,
+      floors: o.mall.floors.map((f) => ({ floor: f.title, shops: f.shops.length, sellers: f.sellers, neighbours: f.neighbours })),
+      hours: o.hours_summary,
+      nearby_malls: o.nearby_malls,
+    }),
   }),
 
   purchase_checklist: def({
