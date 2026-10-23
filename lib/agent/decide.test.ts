@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { decide, decisionSpeech, hubOpenAt, nextOpening, travelTime, type DecideHub, type DecideShop } from './decide';
+import { decide, hubOpenAt, nextOpening, travelTime, type DecideHub, type DecideShop } from './decide';
 import type { WeeklyHours } from '../data/hours';
 
 const day = (open: string, close: string) => ({ status: 'declared', shifts: [{ start_time: `${open}:00`, end_time: `${close}:00` }] });
@@ -132,14 +132,5 @@ describe('helpers', () => {
   });
   it('hub open share counts only shops with hours that day', () => {
     expect(hubOpenAt([week('10:00', '21:00'), week('10:00', '23:59'), null], SUN_2330)).toMatchObject({ share: 0.5, known: 2 });
-  });
-});
-
-describe('the agent reply', () => {
-  it('is at most two sentences: what to do, then the trade-off', () => {
-    const d = decide({ ...base, at: SUN_2330, shops: [shop({ distance_m: 800 }), shop({ distance_m: 5000 })], hubs: [hub()] });
-    const text = decisionSpeech(d);
-    expect(text).toMatch(/^در ترب چیزی نزدیکت باز نیست؛ بهترین شانس «بورس موبایل جمهوری»/);
-    expect(text.split(/[.؟!](?:\s|$)/).filter((x) => x.trim()).length).toBeLessThanOrEqual(2);
   });
 });

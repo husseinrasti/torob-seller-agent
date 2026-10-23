@@ -21,8 +21,7 @@ import { detectMission } from '@/lib/agent/mission/extract';
 import { isSpecQuestion } from '@/lib/search/spec-qa';
 import { placeIndex, scanLocation } from '@/lib/agent/mission/geocode';
 import { parseSituation } from '@/lib/agent/situation';
-import { decisionSpeech } from '@/lib/agent/decide';
-import type { DecisionOutput } from '@/lib/search/decide-data';
+import { capSentences } from '@/lib/agent/brevity';
 import { normalizeForSearch } from '@/lib/fa/normalize';
 
 export const dynamic = 'force-dynamic';
@@ -90,9 +89,6 @@ async function updateMemory(session: Session, before: string, state: SessionStat
   const next = rememberTurn(session.user.memory, prev, state, { productTitle });
   if (next) await saveMemory(session.user.id, next);
 }
-
-const MISSION_HINT =
-  'این پیام یک مأموریت چندمرحله‌ای بود؛ run_mission کامل اجرا شد و گزارشش (جدول فروشنده‌ها، پیگیری‌ها و پیشنهاد) نمایش داده شد. ابزار دیگری صدا نزن. حداکثر ۳ جمله بنویس: یادداشت پوشش محدوده (اگر هست، صریح و صادقانه)، پیشنهاد نهایی یا دلیل نبودنش، و یک قدم بعدی. هر عدد فقط از نتیجه ابزار.';
 
 const textOf = (m?: UIMessage) => (m?.parts ?? []).map((p) => (p.type === 'text' ? p.text : '')).join(' ').trim();
 
@@ -165,17 +161,11 @@ export async function POST(req: Request) {
             role: 'assistant',
             parts: [{ type: `tool-${action.tool}`, toolCallId, state: 'output-available', input: action.input, output } as UIMessage['parts'][number]],
           });
-          // the decision map speaks for itself: ≤ 2 sentences from the engine, no LLM round trip
-          if (action.tool === 'decide_where_to_buy') {
-            const textId = `${toolCallId}_t`;
-            writer.write({ type: 'finish-step' });
-            writer.write({ type: 'text-start', id: textId });
-            writer.write({ type: 'text-delta', id: textId, delta: decisionSpeech(output as DecisionOutput) });
-            writer.write({ type: 'text-end', id: textId });
-            writer.write({ type: 'finish' });
-            await persist(session.id, before, ctx.state).catch(() => {});
-            return;
-          }
+          // a card from a button or a routed request is the answer: no LLM prose repeating it
+          writer.write({ type: 'finish-step' });
+          writer.write({ type: 'finish' });
+          await persist(session.id, before, ctx.state).catch(() => {});
+          return;
         } catch (err) {
           const errorText = err instanceof Error ? err.message : 'خطا در اجرای درخواست';
           writer.write({ type: 'tool-output-error', toolCallId, errorText });
@@ -192,11 +182,8 @@ export async function POST(req: Request) {
       const productTitle = await titleOf(ctx.state.chosenProduct);
       const system =
         systemPrompt(ctx.state, ctx.now, { productTitle, memory: memoryForPrompt(session.user.name, session.user.memory) }) +
-        (action?.tool === 'run_mission'
-          ? `\n\n${MISSION_HINT}`
-          : action
-            ? `\n\nکاربر با لمس دکمه، ابزار ${action.tool} را اجرا کرد و نتیجه‌اش نمایش داده شد. همان ابزار را دوباره صدا نزن؛ فقط در ۱ تا ۲ جمله نتیجه را جمع‌بندی کن و قدم بعدی را پیشنهاد بده.`
-            : '');
+        // only reached after an action when the tool failed: one sentence on what happened
+        (action ? `\n\nاجرای ابزار ${action.tool} ناموفق بود (خطایش در گفتگو هست). همان ابزار را دوباره صدا نزن؛ در یک جمله‌ی کوتاه بگو چه شد و چه کار دیگری می‌شود کرد.` : '');
 
       let noticed = false;
       const result = streamText({
@@ -204,12 +191,14 @@ export async function POST(req: Request) {
           console.warn('[api/chat] provider failed, using offline rules:', err instanceof Error ? err.message : err);
           if (noticed) return;
           noticed = true;
-          writer.write({ type: 'data-notice', data: { text: 'دستیار هوشمند (مدل زبانی) در دسترس نبود؛ این پاسخ با حالت ساده و قاعده‌محور تولید شد.' } });
+          writer.write({ type: 'data-notice', data: { text: 'حالت ساده (مدل زبانی در دسترس نبود)' } });
         }),
         system,
         messages: await convertToModelMessages([...messages, ...extra], { tools, ignoreIncompleteToolCalls: true }),
         tools,
         stopWhen: stepCountIs(10),
+        // the cards carry the details; the prose stops after two sentences
+        experimental_transform: capSentences(2),
         timeout: { stepMs: 25_000 },
         maxRetries: 1,
       });

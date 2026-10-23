@@ -114,6 +114,8 @@ export type Decision = {
   tiers: Tier[];
   recommended: TierKey | null;
   verdict: string;
+  /** one short line for the card headline (the full verdict stays in its tier) */
+  headline: string;
   tradeoffs: string[];
   /** «جمعه ۸۸٪ فروشنده‌های این اطراف تعطیل‌اند» when most listed shops within 3 km are closed all day */
   day_note: string | null;
@@ -399,6 +401,7 @@ export function decide(input: DecideInput): Decision {
     tiers: ordered,
     recommended,
     verdict: recommended ? get(recommended).verdict : get('open_listed_near').verdict,
+    headline: headlineOf(recommended, { t1, t2, hubs, unknown, t5, need, when }),
     tradeoffs: tradeoffs.slice(0, 3),
     day_note: dayNote,
     closed_near: closedNear.slice(0, 80).map((p) => ({ shop_id: p.shop_id, name: p.name, lat: p.lat, lon: p.lon, label: `بسته${p.opens ? ` · ${p.opens.label}` : ''}` })),
@@ -406,30 +409,25 @@ export function decide(input: DecideInput): Decision {
   };
 }
 
-/** The agent's reply after the map (≤ 2 sentences): what to do now, then the main trade-off. No LLM. */
-export function decisionSpeech(d: Decision): string {
-  const rec = d.tiers.find((t) => t.key === d.recommended);
-  const s = rec?.shops[0];
-  const h = rec?.hubs[0];
-  let first: string;
-  switch (d.recommended) {
+const shortHub = (name: string) => name.replace(/\s*\(.*\)$/u, '');
+
+function headlineOf(
+  rec: TierKey | null,
+  x: { t1: ShopPick[]; t2: ShopPick[]; hubs: HubPick[]; unknown: ShopPick[]; t5: ShopPick[]; need: string; when: string },
+): string {
+  switch (rec) {
     case 'open_listed_near':
-      first = `پیشنهادم «${s!.name}» است: ${travelLabel(s!.travel)}، ${closesText(s!)}${s!.hurry ? ' — عجله کن' : ''}.`;
-      break;
+      return `«${x.t1[0].name}» ${formatDistance(x.t1[0].distance_m)}ی‌ات ${x.when} باز است${x.t1[0].open.closesAt ? `، ${closesText(x.t1[0])}` : ''}.`;
     case 'open_listed_far':
-      first = `نزدیکت چیزی باز نیست؛ «${s!.name}» در ${formatDistance(s!.distance_m)} باز است (${travelLabel(s!.travel)}).`;
-      break;
+      return `نزدیکت چیزی باز نیست؛ «${x.t2[0].name}» در ${formatDistance(x.t2[0].distance_m)} باز است.`;
     case 'hub_nearby':
-      first = `در ترب چیزی نزدیکت باز نیست؛ بهترین شانس «${h!.name.replace(/\s*\(.*\)$/u, '')}» در ${formatDistance(h!.distance_m)} است، ولی ${h!.confidence === 'low' ? 'مطمئن نیست' : 'فقط احتمالی است'}.`;
-      break;
+      return `نزدیک «${shortHub(x.hubs[0].name)}» هستی؛ شاید آن‌جا مغازه‌ای باز باشد که ${x.need} بفروشد ولی در ترب ثبت نشده.`;
     case 'unknown_hours_near':
-      first = 'فروشنده‌ی بازی در ترب ثبت نشده؛ چند مغازه‌ی نزدیک ساعتشان معلوم نیست — یک پیام بپرس.';
-      break;
+      return `فروشنده‌ی بازی ثبت نشده؛ ساعت ${toFaDigits(x.unknown.length)} مغازه‌ی نزدیک معلوم نیست — بپرس.`;
     case 'opens_soonest':
-      first = `فعلاً نزدیکت چیزی باز نیست؛ «${s!.name}» ${s!.opens!.label} باز می‌شود.`;
-      break;
+      return `زودترین: «${x.t5[0].name}» ${x.t5[0].opens!.label}.`;
     default:
-      first = `برای ${d.need} در این ساعت و این محدوده فروشنده‌ای در ترب پیدا نکردم.`;
+      return `برای ${x.need} در این ساعت و این محدوده فروشنده‌ای در ترب پیدا نکردم.`;
   }
-  return [first, d.tradeoffs[0]].filter(Boolean).join(' ');
 }
+
