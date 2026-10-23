@@ -18,6 +18,7 @@ import { chatModel, llmMode } from '@/lib/llm';
 import { q } from '@/lib/db/client';
 import type { ActionMetadata } from '@/lib/agent/types';
 import { detectMission } from '@/lib/agent/mission/extract';
+import { isSpecQuestion } from '@/lib/search/spec-qa';
 
 export const dynamic = 'force-dynamic';
 export const maxDuration = 60;
@@ -98,6 +99,10 @@ export async function POST(req: Request) {
     const text = textOf(last);
     const det = text ? await detectMission(text, ctx.state).catch(() => null) : null;
     if (det?.mission_like) action = { tool: 'run_mission', input: { text } };
+    // «این گوشی NFC داره؟» about the product on screen → answered from its specs, never from memory
+    else if (text && (ctx.state.chosenProduct || ctx.state.candidates.length) && isSpecQuestion(text)) action = { tool: 'product_specs_qa', input: { question: text } };
+    // «چرا این اول شد؟» about the list on screen → its score breakdown, not the model's guess
+    else if (text && ctx.state.chosenProduct && /چرا\s+(?:این|اون|اولی|\S+)?\s*(?:اول|رتبه|بالاتر|برتر)/u.test(text)) action = { tool: 'explain_rank', input: {} };
   }
 
   const stream = createUIMessageStream({

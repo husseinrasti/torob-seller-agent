@@ -5,6 +5,8 @@ import { pool, q } from '../lib/db/client';
 import { DEFAULT_STATE, type SessionState } from '../lib/agent/state';
 import { appNow } from '../lib/data/hours';
 import { visitTime } from '../lib/search/visit-time';
+import { specQa } from '../lib/agent/spec-qa';
+import { groundedIn, NOT_LISTED } from '../lib/search/spec-qa';
 
 process.env.LLM_PROVIDER = 'offline';
 
@@ -36,8 +38,29 @@ async function f11() {
   check('F11 Friday closed share > 0.5 across all shops with hours', all.closed / all.known > 0.5, `${Math.round((100 * all.closed) / all.known)}%`);
 }
 
+// F8: answers come from registered specs only; evidence holds every quoted value
+const SPEC_GOLDEN: Array<[string, RegExp]> = [
+  ['این گوشی NFC داره؟', /NFC دارد/],
+  ['وزنش چنده؟', /۱۹۰ گرم/],
+  ['باتریش چند میلی آمپره؟', /۵۰۰۰/],
+  ['صفحه‌اش چند اینچه؟', /۶\.۷ اینچ/],
+  ['رمش چقدره؟', /۴ گیگابایت/],
+  ['چه رنگیه؟', /مشکی/],
+  ['شارژرش چند واته؟', /۲۵ وات/],
+  ['قلم S Pen داره؟', new RegExp(NOT_LISTED)],
+];
+
+async function f8() {
+  for (const [question, expected] of SPEC_GOLDEN) {
+    const r = await specQa(question, [A17_128_4]);
+    const ok = expected.test(r.answer) && groundedIn(r.answer, r.evidence) && (r.answer.includes(NOT_LISTED) || r.evidence.some((e) => r.answer.includes(e.value)));
+    check(`F8 «${question}»`, ok, r.answer);
+  }
+}
+
 async function main() {
   await f11();
+  await f8();
   let failed = 0;
   for (const [name, ok, detail] of checks) {
     if (!ok) failed++;

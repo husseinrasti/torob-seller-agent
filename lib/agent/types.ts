@@ -8,6 +8,8 @@ import type { AlternativesResult } from '../search/alternatives';
 import type { PlanPayload } from '../plan/trip';
 import type { MissionResult } from './mission/types';
 import type { VisitTimeOutput } from '../search/visit-time';
+import type { SpecAnswerOutput } from './spec-qa';
+import type { RankExplainOutput } from './tools';
 
 export type ClarifyOutput = { ui: 'clarify'; question: string; chips: string[] };
 
@@ -61,6 +63,8 @@ export type ToolOutput =
   | PlanOutput
   | MissionResult
   | VisitTimeOutput
+  | SpecAnswerOutput
+  | RankExplainOutput
   | ErrorOutput;
 
 /** Message metadata used by UI actions: run `tool` with `input` right away, then let the agent comment. */

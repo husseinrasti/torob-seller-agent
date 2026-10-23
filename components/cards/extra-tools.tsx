@@ -8,6 +8,8 @@ import { Checklist } from './checklist';
 import { TripPlan } from './trip-plan';
 import { MissionResultCard } from './mission-result';
 import { VisitTimeCard } from './visit-time';
+import { SpecAnswerCard } from './spec-answer';
+import { RankExplainCard } from './rank-explain';
 
 /** Tool outputs other than the core four: shop details, follow-ups, alternatives, checklist, plan. */
 export function ExtraToolView({ output, toolCallId, isLastMessage }: { output: ToolOutput; toolCallId: string; isLastMessage: boolean }) {
@@ -24,6 +26,10 @@ export function ExtraToolView({ output, toolCallId, isLastMessage }: { output: T
       return <MissionResultCard output={output} toolCallId={toolCallId} />;
     case 'visit_time':
       return <VisitTimeCard output={output} />;
+    case 'spec_answer':
+      return <SpecAnswerCard output={output} />;
+    case 'rank_explain':
+      return <RankExplainCard output={output} />;
     case 'shop':
       return (
         <div className="space-y-1.5 rounded-2xl border bg-card p-3 text-sm">

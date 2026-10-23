@@ -11,21 +11,14 @@ import { Skeleton } from '@/components/ui/skeleton';
 import { faText, formatToman } from '@/lib/fa/format';
 import { toFaDigits } from '@/lib/fa/digits';
 import type { ShopDetails } from '@/lib/search/sellers';
-import type { Breakdown } from '@/lib/search/score';
+import { FACTOR_LABEL, type Breakdown, type Weights } from '@/lib/search/score';
 import { useSession } from '@/components/app/session-context';
 import { AvailabilityBadge, FreshnessBadge, MallChip, OpenDot, PriceLine } from './badges';
 import { ShopTypeBadge } from '@/components/map/shop-type-icon';
 import { ShopFacts, TrustDots, TrustLinks } from './trust';
 import { shopTypeLabel } from '@/lib/data/shop-types';
 
-const FACTORS: Array<[keyof Breakdown, string]> = [
-  ['price', 'قیمت'],
-  ['distance', 'فاصله'],
-  ['freshness', 'تازگی قیمت'],
-  ['open', 'باز بودن'],
-  ['conditions', 'شرایط خرید'],
-  ['info', 'کامل بودن اطلاعات'],
-];
+const FACTORS = Object.entries(FACTOR_LABEL) as Array<[keyof Weights, string]>;
 
 export function ShopDetailsSheet({
   open,

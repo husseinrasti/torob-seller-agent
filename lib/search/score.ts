@@ -66,6 +66,16 @@ export type ScoreInput = {
 
 export type Breakdown = Weights & { total: number };
 
+/** Persian names of the score factors (breakdown bars, «چرا این اول شد؟»). */
+export const FACTOR_LABEL: Record<keyof Weights, string> = {
+  price: 'قیمت',
+  distance: 'فاصله',
+  freshness: 'تازگی قیمت',
+  open: 'باز بودن',
+  conditions: 'شرایط خرید',
+  info: 'کامل بودن اطلاعات',
+};
+
 const FRESH_SCORE: Record<Freshness, number> = { fresh: 1, recent: 0.6, stale: 0.2, unknown: 0.3 };
 
 export function passesFilters(r: ScoreInput, f: Filters): boolean {

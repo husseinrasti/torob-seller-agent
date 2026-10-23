@@ -120,6 +120,15 @@ function summarize(toolName: string, v: Json | null, error?: string): string {
       return 'برنامه مراجعه آماده است؛ ترتیب، زمان رسیدن و باز بودن هر مغازه را ببینید و لینکش را به اشتراک بگذارید.';
     case 'purchase_checklist':
       return 'این نکته‌ها را هنگام خرید حضوری چک کنید.';
+    case 'explain_rank': {
+      const shares = (v.shares_percent ?? {}) as Record<string, number>;
+      const top = Object.entries(shares).sort((a, b) => b[1] - a[1]).slice(0, 3).map(([k, n]) => `${k} ${toFaDigits(n)}٪`).join('، ');
+      return `«${String(v.shop)}» رتبه ${toFaDigits(Number(v.rank))} شد چون ${((v.why as string[]) ?? []).join(' و ') || 'امتیاز کلی بالاتری دارد'}؛ سهم معیارها: ${top}.`;
+    }
+    case 'product_specs_qa':
+      return `${String(v.answer)}.`;
+    case 'best_time_to_visit':
+      return `${String(v.sentence)}.`;
     case 'run_mission': {
       if (v.clarify) return String(v.clarify);
       const rec = v.recommendation as Json | null;

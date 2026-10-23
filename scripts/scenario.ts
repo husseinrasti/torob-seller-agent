@@ -123,14 +123,6 @@ async function main() {
   await webCard.getByRole('button', { name: /کامل بودن اطلاعات/ }).click();
   await snapAs(page, '24-trust-signals', 'article[id^="shop-"]:has-text("گوشی مارکت")');
 
-  // F11) «کی برم؟» from the seller list: per-hour heatmap, best window, Friday closures
-  await page.getByRole('button', { name: 'کی برم؟' }).last().click();
-  const visit = page.locator('[data-visit-time]').last();
-  await visit.waitFor({ timeout: 60_000 });
-  await waitIdle(page);
-  const visitText = await visit.innerText();
-  check('F11. best time to visit (window, Friday, unknown hours)', /یکشنبه بین [۰-۹]+ تا [۰-۹]+، [۰-۹]+٪/.test(visitText) && /جمعه [۰-۹]+٪ تعطیل/.test(visitText), visitText.split('\n').slice(-1)[0]);
-  await snapAs(page, '25-visit-time', '[data-visit-time]');
 
   // 3a) map with every shop of the area + numbered sellers; tapping a seller opens its details
   if (!desktop) await page.getByRole('button', { name: 'نقشه' }).click();
@@ -190,8 +182,32 @@ async function main() {
   await page.waitForTimeout(500);
   await waitIdle(page);
   const lastText = await page.locator('[data-role="assistant"]').last().innerText();
-  check('4. «چرا این اول شد؟» explained from why/score_breakdown', /اول|امتیاز|قیمت|فاصله/.test(lastText), lastText.slice(0, 120));
+  check('4. «چرا این اول شد؟» explained from why/score_breakdown', /[۰-۹]+٪/.test(lastText) && /قیمت|فاصله/.test(lastText), lastText.slice(0, 120));
   await snap(page, 'why-first', '[data-role="assistant"]');
+
+  // F8) a spec question about the chosen product: answered from its registered specs, evidence → spec table
+  await page.locator('textarea').fill('این گوشی NFC داره؟');
+  await page.locator('textarea').press('Enter');
+  const specCard = page.locator('[data-spec-answer]').last();
+  await specCard.waitFor({ timeout: 60_000 });
+  await waitIdle(page);
+  const specText = await specCard.innerText();
+  await snapAs(page, '26-spec-answer', '[data-spec-answer]');
+  await specCard.getByRole('button', { name: /NFC/ }).first().click();
+  const focusRow = page.locator('[data-spec-table] tr[data-focus="true"]');
+  await focusRow.waitFor({ timeout: 15_000 });
+  check('F8. spec answer grounded in registered specs (evidence → spec table)', /بله، NFC دارد/.test(specText) && /NFC/.test(await focusRow.innerText()), specText.split('\n')[1]);
+  await page.keyboard.press('Escape');
+  await page.waitForTimeout(300);
+
+  // F11) «کی برم؟» from the seller list: per-hour heatmap, best window, Friday closures
+  await page.getByRole('button', { name: 'کی برم؟' }).last().click();
+  const visit = page.locator('[data-visit-time]').last();
+  await visit.waitFor({ timeout: 60_000 });
+  await waitIdle(page);
+  const visitText = await visit.innerText();
+  check('F11. best time to visit (window, Friday, unknown hours)', /یکشنبه بین [۰-۹]+ تا [۰-۹]+، [۰-۹]+٪/.test(visitText) && /جمعه [۰-۹]+٪ تعطیل/.test(visitText), visitText.split('\n').slice(-1)[0]);
+  await snapAs(page, '25-visit-time', '[data-visit-time]');
   if (upto < 5) return finish();
 
   // 5) follow up the top 3 → live board with mixed outcomes → automatic alternatives

@@ -8,7 +8,7 @@ import { normalizeForSearch } from '../fa/normalize';
 import { q } from '../db/client';
 import { formatDistance, formatTomanShort } from '../fa/format';
 import { toFaDigits } from '../fa/digits';
-import { FILTER_LABEL, type Filters } from '../search/score';
+import { FACTOR_LABEL, FILTER_LABEL, INTENT_WEIGHTS, type Breakdown, type Filters, type Weights } from '../search/score';
 import { paymentWording } from '../data/trust';
 import type { SessionState } from './state';
 import type { Suggestion } from './suggest';
@@ -17,6 +17,7 @@ import { findAlternatives } from '../search/alternatives';
 import { purchaseChecklist } from './checklist';
 import { buildPlan } from '../plan/service';
 import { visitTime, type VisitTimeOutput } from '../search/visit-time';
+import { specProductIds, specQa, type SpecAnswerOutput } from './spec-qa';
 import { WEEK, visitSentence } from '../data/hours-stats';
 import { atLocalTime, FA_DAY } from '../data/hours';
 import { extractMission } from './mission/extract';
@@ -36,6 +37,20 @@ import type {
 } from './types';
 
 export { SIM_DISCLAIMER } from '../sim/followups';
+
+export type RankExplainOutput = {
+  ui: 'rank_explain';
+  rank: number;
+  count: number;
+  shop_name: string;
+  shop_id: string;
+  offer_id: string;
+  why: string[];
+  breakdown: Breakdown;
+  weights: Weights;
+  intent: string;
+  next: { shop_name: string; score: number } | null;
+};
 
 export type ToolCtx = {
   sessionId: string;
@@ -266,6 +281,44 @@ export const TOOL_DEFS = {
     }),
   }),
 
+  explain_rank: def({
+    description:
+      '«چرا این اول شد؟»: why a seller of the current list ranks where it does (default: the first), from its score breakdown — share of each factor and the intent weights. Never explain a ranking from memory.',
+    input: z.object({ offer_id: z.string().optional(), rank: z.number().int().min(1).max(50).optional() }),
+    run: async (i, ctx): Promise<RankExplainOutput> => {
+      const st = ctx.state;
+      const productId = st.chosenProduct ?? st.candidates[0];
+      if (!productId) throw new Error('هنوز فهرست فروشنده‌ای نداریم.');
+      const res = await findSellers({ product_ids: [productId], lat: st.location.lat, lon: st.location.lon, radius_m: st.radius_m, filters: st.filters, intent: st.intent, now: ctx.now });
+      const idx = i.offer_id ? res.rows.findIndex((r) => r.offer_id === i.offer_id) : (i.rank ?? 1) - 1;
+      const row = res.rows[idx];
+      if (!row) throw new Error('این ردیف در فهرست فعلی نیست.');
+      const next = res.rows[idx + 1];
+      return {
+        ui: 'rank_explain',
+        rank: idx + 1,
+        count: res.rows.length,
+        shop_name: row.shop_name,
+        shop_id: row.shop_id,
+        offer_id: row.offer_id,
+        why: row.why,
+        breakdown: row.score_breakdown,
+        weights: INTENT_WEIGHTS[st.intent],
+        intent: st.intent,
+        next: next ? { shop_name: next.shop_name, score: next.score } : null,
+      };
+    },
+    toModel: (o) => ({
+      rank: o.rank,
+      shop: o.shop_name,
+      why: o.why,
+      shares_percent: Object.fromEntries((Object.keys(FACTOR_LABEL) as Array<keyof Weights>).map((k) => [FACTOR_LABEL[k], Math.round(o.breakdown[k] * 100)])),
+      weights_percent: Object.fromEntries((Object.keys(FACTOR_LABEL) as Array<keyof Weights>).map((k) => [FACTOR_LABEL[k], Math.round(o.weights[k] * 100)])),
+      total: o.breakdown.total,
+      next: o.next,
+    }),
+  }),
+
   shop_details: def({
     description: 'Mall/floor/unit, today’s hours, payment conditions and up to 5 other offers of the same category in one shop.',
     input: z.object({ shop_id: z.string() }),
@@ -403,6 +456,14 @@ export const TOOL_DEFS = {
       const fri = o.days.find((d) => d.day === 'fri') ?? null;
       return { title: o.title, shops: o.shops, day: FA_DAY[o.day], window: day.window ? { from: day.window.start, to: day.window.end, open_share: day.window.coverage } : null, friday_closed_share: fri?.closedShare ?? null, hours_unknown: day.unknown, sentence: visitSentence(day, fri, o.noun) };
     },
+  }),
+
+  product_specs_qa: def({
+    description:
+      'Answer a factual question about the chosen product or two products («NFC داره؟»، «وزنش چنده؟»، «باتری؟»، «فرقش با اون یکی؟») strictly from their registered specs, with the evidence rows. Call it for ANY factual product question; never answer specs from memory. product_ids defaults to the chosen product (two candidates when comparing).',
+    input: z.object({ question: z.string().min(2).max(200), product_ids: z.array(z.string()).max(3).optional() }),
+    run: async (i, ctx): Promise<SpecAnswerOutput> => specQa(i.question, specProductIds(i.question, ctx.state, i.product_ids)),
+    toModel: (o) => ({ answer: o.answer, evidence: o.evidence.slice(0, 6).map((e) => `${e.key}: ${e.value}`), products: o.products.map((p) => p.title), note: 'Repeat the answer; add nothing that is not in the evidence.' }),
   }),
 
   purchase_checklist: def({
