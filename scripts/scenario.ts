@@ -1,12 +1,14 @@
-// Drives the demo scenario (spec §13) on a 390px viewport and saves a screenshot per step.
-// Usage: pnpm scenario [baseUrl] [--out=docs/screenshots] [--upto=7]
+// Drives the demo scenario (spec §13) on a 390px phone (or a 1440px desktop) and saves a screenshot per step.
+// Usage: pnpm scenario [baseUrl] [--out=docs/screenshots] [--upto=8] [--desktop] [--dark]
 import { chromium, type Page } from 'playwright-core';
 import fs from 'node:fs';
 
 const base = process.argv.find((a) => a.startsWith('http')) || process.env.APP_URL || 'http://localhost:3010';
 const out = process.argv.find((a) => a.startsWith('--out='))?.slice(6) || 'docs/screenshots/tmp';
-const upto = Number(process.argv.find((a) => a.startsWith('--upto='))?.slice(7) || 7);
+const upto = Number(process.argv.find((a) => a.startsWith('--upto='))?.slice(7) || 8);
 const dark = process.argv.includes('--dark');
+const desktop = process.argv.includes('--desktop');
+const USER = 'داور';
 const DEMO_TIME = '2026-10-25T16:00';
 
 type Check = { step: string; ok: boolean; detail?: string };
@@ -23,7 +25,6 @@ async function snap(page: Page, name: string, locator?: string, which: 'first' |
   if (locator) {
     const el = which === 'first' ? page.locator(locator).first() : page.locator(locator).last();
     await el.evaluate((n) => n.scrollIntoView({ block: 'start', inline: 'nearest' })).catch(() => {});
-    await page.evaluate(() => window.scrollBy(0, -170));
   }
   await page.waitForTimeout(350);
   await page.screenshot({ path: file });
@@ -40,16 +41,27 @@ async function main() {
   fs.mkdirSync(out, { recursive: true });
   const started = Date.now();
   const browser = await chromium.launch({ channel: process.env.PW_CHANNEL || 'chrome', headless: true });
-  const ctx = await browser.newContext({ viewport: { width: 390, height: 844 }, deviceScaleFactor: 2, locale: 'fa-IR', hasTouch: true, isMobile: true });
+  const ctx = await browser.newContext(
+    desktop
+      ? { viewport: { width: 1440, height: 900 }, deviceScaleFactor: 1, locale: 'fa-IR' }
+      : { viewport: { width: 390, height: 844 }, deviceScaleFactor: 2, locale: 'fa-IR', hasTouch: true, isMobile: true },
+  );
   if (dark) await ctx.addInitScript(() => localStorage.setItem('theme', 'dark'));
   const page = await ctx.newPage();
   const consoleErrors: string[] = [];
-  page.on('console', (m) => m.type() === 'error' && consoleErrors.push(m.text()));
+  // product photos come from image.torob.com, which is not reachable from every network — not an app error
+  page.on('console', (m) => m.type() === 'error' && !m.location().url.includes('image.torob.com') && consoleErrors.push(m.text()));
   page.on('pageerror', (e) => consoleErrors.push(e.message));
   const chatCalls: string[] = [];
-  page.on('request', (r) => r.url().includes('/api/chat') && chatCalls.push(r.url()));
+  page.on('request', (r) => new URL(r.url()).pathname === '/api/chat' && r.method() === 'POST' && chatCalls.push(r.url()));
 
+  // signed out → name-only login screen
   await page.goto(`${base}/demo-reset?demo_time=${DEMO_TIME}`, { waitUntil: 'networkidle' });
+  check('0. login screen (name only)', await page.getByLabel('اسمت چیه؟').isVisible());
+  await snap(page, 'login');
+  // demo user with a clean history and memory
+  await page.goto(`${base}/demo-reset?demo_time=${DEMO_TIME}&name=${encodeURIComponent(USER)}`, { waitUntil: 'networkidle' });
+  await page.getByRole('button', { name: 'گوشی سامسونگ تا ۶۰ میلیون نزدیک من' }).waitFor({ timeout: 30_000 });
   await snap(page, 'home');
 
   // 1) chip → product cards
@@ -79,15 +91,21 @@ async function main() {
   await snap(page, 'sellers', 'section[aria-busy]');
   await snap(page, 'seller-cards', 'article[id^="shop-"]', 'first');
 
-  // 3a) map panel with numbered sellers
-  await page.getByRole('button', { name: 'نقشه' }).click();
+  // 3a) map with every shop of the area + numbered sellers; tapping a seller opens its details
+  if (!desktop) await page.getByRole('button', { name: 'نقشه' }).click();
   await page.locator('.maplibregl-canvas').waitFor({ timeout: 30_000 });
-  await page.waitForTimeout(2500);
+  await page.waitForTimeout(3000);
   const markers = await page.locator('.maplibregl-marker').count();
-  check('3. map panel shows sellers', markers >= 10, `${markers} markers`);
-  await page.evaluate(() => window.scrollTo({ top: 0 }));
+  const legend = await page.getByText(/فروشگاه در محدوده/).first().innerText().catch(() => '');
+  check('3. map shows sellers and all shops of the area', markers >= 10 && /[۰-۹]/.test(legend), `${markers} pins · ${legend}`);
   await snap(page, 'map');
-  await page.getByRole('button', { name: 'نقشه' }).click();
+  await page.locator('button.maplibregl-marker', { hasText: /^۱$/ }).first().click();
+  await page.getByText('کالای انتخابی شما را ثبت کرده است').waitFor({ timeout: 20_000 });
+  check('3. selecting a shop on the map opens its details', true);
+  await snap(page, 'map-shop-details');
+  await page.keyboard.press('Escape');
+  await page.waitForTimeout(400);
+  if (!desktop) await page.getByRole('button', { name: 'نقشه' }).click();
 
   // 3b) ContextBar changes re-filter without the LLM
   const before = chatCalls.length;
@@ -155,6 +173,9 @@ async function main() {
   const planText = await page.locator('section[data-plan-id]').last().innerText();
   check('6. trip plan with malls, ETA and open-at-arrival', /برنامه مراجعه/.test(planText) && /پاساژ/.test(planText) && /(باز|بسته) در زمان رسیدن/.test(planText), planText.split('\n').slice(0, 3).join(' / '));
   check('6. navigation links (Neshan / Google / OSM)', (await page.locator('section[data-plan-id] a[href*="neshan.org"]').count()) > 0);
+  const oosShop = altText.match(/«(.+?)» ناموجود/)?.[1];
+  check('6. plan skips the out-of-stock shop', Boolean(oosShop) && !planText.includes(oosShop!), oosShop);
+  check('6. plan shows resolved follow-up statuses', !/در حال پیگیری/.test(planText));
   await snap(page, 'trip-plan', 'section[data-plan-id]');
   await page.locator('section[data-plan-id]').last().getByRole('button', { name: 'چک‌لیست خرید' }).click();
   await page.getByText('چک‌لیست خرید حضوری').last().waitFor({ timeout: 30_000 });
@@ -164,7 +185,7 @@ async function main() {
   await snap(page, 'checklist', 'section:has-text("چک‌لیست خرید حضوری")');
   if (upto < 7) return finish();
 
-  // 7) shared plan link opens the read-only page
+  // 7) shared plan link opens the read-only page (8 follows)
   const planId = await page.locator('section[data-plan-id]').last().getAttribute('data-plan-id');
   const shared = await ctx.newPage();
   const res = await shared.goto(`${base}/plan/${planId}`, { waitUntil: 'networkidle' });
@@ -173,6 +194,27 @@ async function main() {
   await shared.screenshot({ path: `${out}/${String(++shot).padStart(2, '0')}-shared-plan.png` });
   console.log(`      📸 ${out}/${String(shot).padStart(2, '0')}-shared-plan.png`);
   await shared.close();
+  if (upto < 8) return finish();
+
+  // 8) memory + history: a new chat greets by name, remembers the search and resumes the previous chat
+  await page.getByRole('button', { name: 'گفتگوی تازه' }).filter({ visible: true }).first().click();
+  await page.getByText('از جایی که مانده بودیم').waitFor({ timeout: 20_000 });
+  const heroText = await page.locator('[data-scroller]').innerText();
+  check('8. new chat greets by name and remembers the last search', heroText.includes(`سلام ${USER}`) && heroText.includes('گوشی سامسونگ تا ۶۰ میلیون'));
+  await snap(page, 'memory-new-chat');
+  if (!desktop) {
+    await page.getByRole('button', { name: 'گفتگوهای قبلی' }).click();
+    await page.getByRole('navigation', { name: 'گفتگوهای قبلی' }).waitFor({ timeout: 10_000 });
+    await snap(page, 'history');
+    await page.keyboard.press('Escape');
+    await page.waitForTimeout(400);
+  }
+  await page.getByRole('button', { name: /^ادامه «/ }).first().click();
+  await page.locator('section[data-plan-id]').last().waitFor({ timeout: 30_000 });
+  const resumed = await page.locator('[data-scroller]').innerText();
+  check('8. previous chat resumes with its cards (plan, follow-ups, sellers)', /تابلو پیگیری/.test(resumed) && /برنامه مراجعه/.test(resumed) && /فروشنده در شعاع/.test(resumed));
+  check('8. URL carries the chat id', /[?&]c=[0-9a-f-]{36}/.test(page.url()), page.url());
+  await snap(page, 'resumed-chat', 'section[data-plan-id]');
 
   return finish();
 
