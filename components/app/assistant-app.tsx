@@ -55,15 +55,18 @@ type WorkspaceProps = {
   onLogout: () => void;
   /** the chat got its first message (URL + history list) or finished a reply */
   onChatSaved: (firstMessage: boolean) => void;
+  /** ?demo_time= — sent with every chat request so a brand-new chat never runs on the real clock */
+  demoTime: string | null;
 };
 
-function Workspace({ chatId, initialMessages, me, chats, onNewChat, onOpenChat, onDeleteChat, onClearMemory, onLogout, onChatSaved }: WorkspaceProps) {
+function Workspace({ chatId, initialMessages, me, chats, onNewChat, onOpenChat, onDeleteChat, onClearMemory, onLogout, onChatSaved, demoTime }: WorkspaceProps) {
   const session = useSession();
   const desktop = useIsDesktop();
   const [mapOpen, setMapOpen] = useState(false);
   const [historyOpen, setHistoryOpen] = useState(false);
   const scroller = useRef<HTMLElement>(null);
-  const transport = useMemo(() => new DefaultChatTransport({ api: '/api/chat' }), []);
+  // mode 'auto': the server runs compound requests as one mission (see /api/chat)
+  const transport = useMemo(() => new DefaultChatTransport({ api: '/api/chat', body: { mode: 'auto', demo_time: demoTime } }), [demoTime]);
   const { messages, sendMessage, status, error, stop, setMessages, clearError } = useChat({
     id: chatId,
     messages: initialMessages,
@@ -365,6 +368,7 @@ export function AssistantApp({ initialChatId, demoTime }: { initialChatId: strin
       <FollowupsProvider>
         <Workspace
           chatId={chatId}
+          demoTime={demoTime}
           initialMessages={initialMessages}
           me={me}
           chats={chats}

@@ -13,6 +13,10 @@ export const HERO_CHIPS = [
   'دوربین مداربسته برای مغازه',
 ];
 
+/** A compound request run as one mission (5th hero chip; spec example that the plain agent used to drop). */
+export const MISSION_EXAMPLE =
+  'من یه گوشی سامسونگ حدود قیمت ۵۰ میلیون تومن میخوام. محدوده سعادت آباد باشه. و خودت بپرس ببین قیمت‌هاشون آپدیت هست یا نه و اینکه الان باز هستند.';
+
 export function suggestFromState(s: SessionState): Suggestion[] {
   if (!s.candidates.length && !s.chosenProduct) return HERO_CHIPS.map((t) => ({ kind: 'message', label: t, text: t }));
   const out: Suggestion[] = [];

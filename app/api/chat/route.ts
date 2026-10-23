@@ -17,6 +17,7 @@ import { appNow } from '@/lib/data/hours';
 import { chatModel, llmMode } from '@/lib/llm';
 import { q } from '@/lib/db/client';
 import type { ActionMetadata } from '@/lib/agent/types';
+import { detectMission } from '@/lib/agent/mission/extract';
 
 export const dynamic = 'force-dynamic';
 export const maxDuration = 60;
@@ -63,8 +64,13 @@ async function updateMemory(session: Session, before: string, state: SessionStat
   if (next) await saveMemory(session.user.id, next);
 }
 
+const MISSION_HINT =
+  'این پیام یک مأموریت چندمرحله‌ای بود؛ run_mission کامل اجرا شد و گزارشش (جدول فروشنده‌ها، پیگیری‌ها و پیشنهاد) نمایش داده شد. ابزار دیگری صدا نزن. حداکثر ۳ جمله بنویس: یادداشت پوشش محدوده (اگر هست، صریح و صادقانه)، پیشنهاد نهایی یا دلیل نبودنش، و یک قدم بعدی. هر عدد فقط از نتیجه ابزار.';
+
+const textOf = (m?: UIMessage) => (m?.parts ?? []).map((p) => (p.type === 'text' ? p.text : '')).join(' ').trim();
+
 export async function POST(req: Request) {
-  const body = (await req.json().catch(() => null)) as { id?: string; messages?: UIMessage[] } | null;
+  const body = (await req.json().catch(() => null)) as { id?: string; messages?: UIMessage[]; mode?: string; demo_time?: string | null } | null;
   const all = body?.messages ?? [];
   const messages = all.slice(-MAX_HISTORY);
   if (!messages.length) return new Response('messages required', { status: 400 });
@@ -75,17 +81,30 @@ export async function POST(req: Request) {
   } catch (err) {
     return errorResponse(err);
   }
+  // the page's demo clock wins over a chat created a moment ago (its PATCH may still be in flight)
+  if (body && 'demo_time' in body && (session.state.demoTime ?? null) !== (body.demo_time || null)) {
+    session.state.demoTime = body.demo_time || undefined;
+    await saveState(session.id, session.state).catch(() => {});
+  }
   const before = JSON.stringify(session.state);
   const ctx: ToolCtx = { sessionId: session.id, state: session.state, now: appNow(session.state.demoTime) };
   const tools = buildTools(ctx);
   const last = messages[messages.length - 1];
   const meta = (last?.role === 'user' ? (last.metadata as ActionMetadata | undefined) : undefined) ?? {};
-  const action = meta.action && ACTION_TOOLS.has(meta.action.tool) ? meta.action : undefined;
+  let action = meta.action && ACTION_TOOLS.has(meta.action.tool) ? meta.action : undefined;
+  // auto mode: a compound request («… محدوده سعادت آباد، خودت بپرس قیمت‌ها آپدیته؟») runs as one mission
+  // right away (rules decide; works without the LLM), then the model comments on the report
+  if (!action && body?.mode === 'auto' && last?.role === 'user') {
+    const text = textOf(last);
+    const det = text ? await detectMission(text, ctx.state).catch(() => null) : null;
+    if (det?.mission_like) action = { tool: 'run_mission', input: { text } };
+  }
 
   const stream = createUIMessageStream({
     originalMessages: all,
     generateId: genId,
     execute: async ({ writer }) => {
+      ctx.write = (part) => writer.write(part);
       const extra: UIMessage[] = [];
       if (action) {
         // UI action: run the tool right away so cards appear without waiting for the LLM
@@ -117,7 +136,11 @@ export async function POST(req: Request) {
       const productTitle = await titleOf(ctx.state.chosenProduct);
       const system =
         systemPrompt(ctx.state, ctx.now, { productTitle, memory: memoryForPrompt(session.user.name, session.user.memory) }) +
-        (action ? `\n\nکاربر با لمس دکمه، ابزار ${action.tool} را اجرا کرد و نتیجه‌اش نمایش داده شد. همان ابزار را دوباره صدا نزن؛ فقط در ۱ تا ۲ جمله نتیجه را جمع‌بندی کن و قدم بعدی را پیشنهاد بده.` : '');
+        (action?.tool === 'run_mission'
+          ? `\n\n${MISSION_HINT}`
+          : action
+            ? `\n\nکاربر با لمس دکمه، ابزار ${action.tool} را اجرا کرد و نتیجه‌اش نمایش داده شد. همان ابزار را دوباره صدا نزن؛ فقط در ۱ تا ۲ جمله نتیجه را جمع‌بندی کن و قدم بعدی را پیشنهاد بده.`
+            : '');
 
       let noticed = false;
       const result = streamText({
@@ -130,7 +153,7 @@ export async function POST(req: Request) {
         system,
         messages: await convertToModelMessages([...messages, ...extra], { tools, ignoreIncompleteToolCalls: true }),
         tools,
-        stopWhen: stepCountIs(5),
+        stopWhen: stepCountIs(10),
         timeout: { stepMs: 25_000 },
         maxRetries: 1,
       });

@@ -11,6 +11,8 @@ import { CompareTable } from '@/components/cards/compare-table';
 import { SellerList } from '@/components/cards/seller-list';
 import { ClarifyChips, ContextNote, ToolError } from '@/components/cards/small-cards';
 import { ExtraToolView } from '@/components/cards/extra-tools';
+import { MissionProgressCard } from '@/components/cards/mission-progress';
+import type { MissionProgress } from '@/lib/agent/mission/types';
 
 type ToolPart = {
   type: string;
@@ -30,6 +32,7 @@ const LOADING_LABEL: Record<string, string> = {
   find_alternatives: 'در حال یافتن جایگزین…',
   plan_trip: 'در حال ساختن برنامه مراجعه…',
   purchase_checklist: 'در حال آماده کردن چک‌لیست…',
+  run_mission: 'در حال انجام مأموریت…',
 };
 
 function ToolSkeleton({ name }: { name: string }) {
@@ -107,10 +110,30 @@ const AssistantMessage = memo(function AssistantMessage({
   latestSellersId: string | null;
   isLastMessage: boolean;
 }) {
+  // mission progress is streamed as its own data part; show it right above its report (or instead of the skeleton)
+  const progress = message.parts.filter((p) => p.type === 'data-mission-progress').map((p) => (p as { data: MissionProgress }).data);
+  let missionIdx = 0;
   return (
     <div className="space-y-3" data-role="assistant">
       {message.parts.map((part, i) => {
         if (part.type === 'text') return <AssistantText key={i} text={part.text} />;
+        if (part.type === 'data-mission-progress') return null;
+        if (part.type === 'tool-run_mission') {
+          const p = part as unknown as ToolPart;
+          const prog = progress[missionIdx++];
+          return (
+            <div key={p.toolCallId} className="space-y-3">
+              {prog && <MissionProgressCard progress={prog} />}
+              {p.state === 'output-available' ? (
+                <OutputView toolCallId={p.toolCallId} output={p.output as ToolOutput} isLatestSellers={false} isLastMessage={isLastMessage} />
+              ) : p.state === 'output-error' ? (
+                <ToolError text={p.errorText} />
+              ) : (
+                !prog && <ToolSkeleton name="run_mission" />
+              )}
+            </div>
+          );
+        }
         if (part.type === 'data-notice') {
           return (
             <p key={i} className="rounded-xl bg-recent-bg px-3 py-2 text-xs leading-5 text-recent">

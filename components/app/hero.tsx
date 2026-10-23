@@ -1,10 +1,10 @@
 'use client';
 
 import { useState } from 'react';
-import { Building2, Clock3, Crosshair, History, Map as MapIcon, MessageSquare, Search, ShieldCheck, Sparkles } from 'lucide-react';
+import { Building2, Clock3, Crosshair, History, ListChecks, Map as MapIcon, MessageSquare, Search, ShieldCheck, Sparkles } from 'lucide-react';
 import { toast } from 'sonner';
 import { Button } from '@/components/ui/button';
-import { HERO_CHIPS } from '@/lib/agent/suggest';
+import { HERO_CHIPS, MISSION_EXAMPLE } from '@/lib/agent/suggest';
 import { faText } from '@/lib/fa/format';
 import type { UserMemory } from '@/lib/agent/memory';
 import type { ChatSummary } from '@/lib/agent/state';
@@ -99,6 +99,18 @@ export function Hero({
               {t}
             </button>
           ))}
+          <button
+            disabled={busy}
+            onClick={() => sendText(MISSION_EXAMPLE)}
+            data-mission-chip
+            className="min-h-12 rounded-2xl border border-primary/40 bg-accent/60 px-4 py-3 text-start text-sm shadow-xs transition hover:border-primary hover:bg-accent active:scale-[0.99] disabled:opacity-60 @xl:col-span-2"
+          >
+            <span className="mb-1 flex items-center gap-1 text-[11px] font-semibold text-primary">
+              <ListChecks className="size-3.5" />
+              مأموریت چندمرحله‌ای — خودش تا آخر انجام می‌دهد
+            </span>
+            <span className="leading-6">{MISSION_EXAMPLE}</span>
+          </button>
         </div>
       </div>
 

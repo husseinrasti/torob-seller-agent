@@ -1,9 +1,9 @@
 import { tool, type ToolSet } from 'ai';
 import { z } from 'zod';
-import { routeCategories } from '../search/categories';
-import { compareProducts, searchProducts } from '../search/products';
+import { compareProducts } from '../search/products';
+import { productSearch } from './product-search';
 import { findSellers, shopDetails } from '../search/sellers';
-import { matchPlace } from '../search/places';
+import { geocodeText } from './mission/geocode';
 import { normalizeForSearch } from '../fa/normalize';
 import { q } from '../db/client';
 import { formatDistance, formatTomanShort } from '../fa/format';
@@ -11,10 +11,13 @@ import { toFaDigits } from '../fa/digits';
 import { FILTER_LABEL, type Filters } from '../search/score';
 import type { SessionState } from './state';
 import type { Suggestion } from './suggest';
-import { startFollowups } from '../sim/followups';
+import { SIM_DISCLAIMER, startFollowups } from '../sim/followups';
 import { findAlternatives } from '../search/alternatives';
 import { purchaseChecklist } from './checklist';
 import { buildPlan } from '../plan/service';
+import { extractMission } from './mission/extract';
+import { applyOverrides, missionForModel, runMission } from './mission/run';
+import type { MissionProgress, MissionResult } from './mission/types';
 import type {
   AlternativesOutput,
   ChecklistOutput,
@@ -28,9 +31,17 @@ import type {
   ShopOutput,
 } from './types';
 
-export const SIM_DISCLAIMER = 'شبیه‌سازی‌شده — در نسخه واقعی از طریق پیام‌رسان/تماس ترب انجام می‌شود.';
+export { SIM_DISCLAIMER } from '../sim/followups';
 
-export type ToolCtx = { sessionId: string; state: SessionState; now: Date };
+export type ToolCtx = {
+  sessionId: string;
+  state: SessionState;
+  now: Date;
+  /** writes a custom UI stream part (mission progress) when the request streams */
+  write?: (part: { type: `data-${string}`; id?: string; data: unknown }) => void;
+  /** false = rules only (no LLM calls inside tools), e.g. golden scripts */
+  llm?: boolean;
+};
 
 type Def<I extends z.ZodType, O> = {
   description: string;
@@ -53,9 +64,9 @@ const FiltersInput = z
     warranty_required: z.boolean(),
     hide_stale: z.boolean(),
     hide_suspicious: z.boolean(),
-    max_price: z.number().nullable().describe('toman; null removes the price cap'),
   })
   .partial();
+// no max_price here: a budget said in chat stays state.budget; the hard price cap is the ContextBar's (#25)
 
 function mallText(m: SellersOutput['rows'][number]['mall']): string | null {
   if (!m) return null;
@@ -99,15 +110,8 @@ export const TOOL_DEFS = {
     run: async (i, ctx): Promise<ProductsOutput> => {
       const hinted = i.budget_max || i.budget_min ? { max: i.budget_max ?? undefined, min: i.budget_min ?? undefined } : undefined;
       const text = [i.text, ...(i.must_have ?? [])].join(' ');
-      const route = await routeCategories(text, { budget: hinted });
-      const budget = route.budget ?? hinted;
-      const res = await searchProducts({ text, keywords: route.keywords, categories: route.categories, budget, limit: i.limit ?? 4 });
-      const st = ctx.state;
-      st.need = i.text;
-      st.categories = route.categories;
-      st.candidates = res.products.map((p) => p.product_id);
-      st.chosenProduct = undefined;
-      if (budget) st.budget = budget;
+      const res = await productSearch(ctx.state, { text, budget: hinted, limit: i.limit });
+      ctx.state.need = i.text;
       const suggested: Suggestion[] = res.products.slice(0, 2).map((p) => ({
         kind: 'action',
         label: `فروشنده‌های ${p.title.split('|')[0].trim().slice(0, 28)}`,
@@ -164,10 +168,15 @@ export const TOOL_DEFS = {
       let unresolved: string | undefined;
       const sameAsCurrent = (t: string) => normalizeForSearch(st.location.label.replace(/\(.*?\)/g, '')) === normalizeForSearch(t);
       if (i.location_text && !/^(من|خودم|اینجا|همین جا|همینجا)$/u.test(i.location_text.trim()) && !sameAsCurrent(i.location_text)) {
-        const place = await matchPlace(i.location_text);
+        const place = await geocodeText(i.location_text);
         if (place) {
           st.location = { lat: place.lat, lon: place.lon, label: place.name, source: 'text' };
           changes.push(`📍 ${place.name}`);
+          // a mall is a building: search right around it unless the user also gave a radius
+          if (place.kind === 'mall' && !i.radius_m && st.radius_m > 500) {
+            st.radius_m = place.radius_m;
+            changes.push(`شعاع ${formatDistance(place.radius_m)}`);
+          }
         } else unresolved = i.location_text;
       }
       if (i.radius_m) {
@@ -336,6 +345,28 @@ export const TOOL_DEFS = {
       warnings: o.warnings,
       steps: o.groups.flatMap((g) => g.steps.map((s) => ({ order: s.order, shop: s.shop_name, mall: s.mall, floor: s.floor_label, unit: s.unit_label, eta: s.eta_label, open_at_eta: s.open_at_eta.label, warning: s.warning }))),
     }),
+  }),
+
+  run_mission: def({
+    description:
+      'Multi-goal shopping mission, executed end to end and reported once: product in a budget band, a named Tehran area (radius widened honestly when the area has few listed sellers), open/closed now, simulated follow-ups with the sellers (awaited for a few seconds), optional visit plan. MUST be called — with the user message verbatim in `text` — when a message has two or more goals (product + place, product + checks, place + conditions …) or delegates a check: «خودت بپرس»، «بپرس»، «چک کن»، «پیگیری کن»، «ببین باز هستن»، «مطمئن شو»، «زنگ بزن». Do not call other tools for the same request.',
+    input: z.object({
+      text: z.string().min(2).max(400).describe('the user message, verbatim'),
+      radius_m: z.number().int().min(100).max(20000).optional(),
+      location_text: z.string().max(80).optional().describe('replace the place in the message'),
+      drop: z.array(z.string().max(20)).max(6).optional().describe('constraints to remove: budget, location, open_now, installment, torobpay, fast_delivery, warranty, verify, plan'),
+    }),
+    run: async (i, ctx): Promise<MissionResult> => {
+      const progressId = `mission_${Date.now().toString(36)}`;
+      const emit = (p: MissionProgress) => ctx.write?.({ type: 'data-mission-progress', id: progressId, data: p });
+      emit({ steps: [{ id: 'understand', label: 'فهمیدن درخواست', status: 'running' }], done: false });
+      const draft = await extractMission(i.text, ctx.state, { llm: ctx.llm !== false });
+      const mission = applyOverrides(draft.mission, { radius_m: i.radius_m, location_text: i.location_text, drop: i.drop });
+      const res = await runMission(mission, i.text, { ...ctx, emit });
+      const overrides = { radius_m: i.radius_m, location_text: i.location_text, drop: i.drop };
+      return Object.values(overrides).some(Boolean) ? { ...res, overrides } : res;
+    },
+    toModel: (o) => missionForModel(o),
   }),
 
   purchase_checklist: def({

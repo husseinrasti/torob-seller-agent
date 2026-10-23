@@ -6,6 +6,7 @@ import type { Suggestion } from './suggest';
 import type { FollowupItem } from '../sim/followups';
 import type { AlternativesResult } from '../search/alternatives';
 import type { PlanPayload } from '../plan/trip';
+import type { MissionResult } from './mission/types';
 
 export type ClarifyOutput = { ui: 'clarify'; question: string; chips: string[] };
 
@@ -57,6 +58,7 @@ export type ToolOutput =
   | AlternativesOutput
   | ChecklistOutput
   | PlanOutput
+  | MissionResult
   | ErrorOutput;
 
 /** Message metadata used by UI actions: run `tool` with `input` right away, then let the agent comment. */

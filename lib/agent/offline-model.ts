@@ -120,6 +120,16 @@ function summarize(toolName: string, v: Json | null, error?: string): string {
       return 'برنامه مراجعه آماده است؛ ترتیب، زمان رسیدن و باز بودن هر مغازه را ببینید و لینکش را به اشتراک بگذارید.';
     case 'purchase_checklist':
       return 'این نکته‌ها را هنگام خرید حضوری چک کنید.';
+    case 'run_mission': {
+      if (v.clarify) return String(v.clarify);
+      const rec = v.recommendation as Json | null;
+      const parts = [
+        v.coverage_note as string | null,
+        rec ? `پیشنهاد من ${String(rec.reason)}.` : (v.recommendation_note as string | null),
+        (v.conditions_note as string | null) ?? (v.next_steps as string[] | undefined)?.[0]?.concat(' را هم می‌توانید بزنید.'),
+      ].filter(Boolean);
+      return parts.slice(0, 3).join(' ');
+    }
     default:
       return 'انجام شد.';
   }
