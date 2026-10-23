@@ -177,3 +177,24 @@ export const plans = pgTable('plans', {
   payload: jsonb('payload').notNull(),
   created_at: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
 });
+
+/** «بورس‌ها»: derived commercial clusters (+ curated bazaars), rebuilt by the seed / `pnpm hubs` (lib/data/hubs.ts). */
+export const hubs = pgTable('hubs', {
+  hub_id: text('hub_id').primaryKey(),
+  name: text('name').notNull(),
+  source: text('source').notNull(),
+  lat: doublePrecision('lat').notNull(),
+  lon: doublePrecision('lon').notNull(),
+  radius_m: integer('radius_m').notNull(),
+  families: jsonb('families').$type<string[]>().notNull(),
+  family_counts: jsonb('family_counts').notNull(),
+  shop_count: integer('shop_count').notNull(),
+  listed_count: integer('listed_count').notNull(),
+  category_only_count: integer('category_only_count').notNull(),
+  hours_profile: jsonb('hours_profile'),
+  typical_hours: jsonb('typical_hours'),
+  note: text('note'),
+  malls: jsonb('malls').$type<string[]>().notNull().default([]),
+  street: text('street'),
+  built_at: timestamp('built_at', { withTimezone: true }).notNull().defaultNow(),
+});

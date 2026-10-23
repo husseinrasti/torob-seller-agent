@@ -24,7 +24,8 @@
     "scenario": "tsx scripts/scenario.ts",
     "predev": "node scripts/copy-maplibre-worker.mjs",
     "prebuild": "node scripts/copy-maplibre-worker.mjs",
-    "vision-check": "tsx scripts/vision-check.ts"
+    "vision-check": "tsx scripts/vision-check.ts",
+    "hubs": "tsx scripts/hubs.ts"
   },
   "dependencies": {
     "@ai-sdk/google": "^4.0.102",

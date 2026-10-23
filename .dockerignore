@@ -3,7 +3,8 @@
 node_modules
 .next
 dist-scripts
-data
+data/*
+!data/hubs.curated.json
 video
 docs
 coverage

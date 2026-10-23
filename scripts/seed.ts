@@ -1,6 +1,8 @@
 // Loads data/*.csv into PostgreSQL with all derived columns. Idempotent (truncate + reload).
 // Usage: pnpm seed [--if-empty]
 import './load-env';
+import { rebuildHubs } from '../lib/search/hubs';
+import { pool as appPool } from '../lib/db/client';
 import fs from 'node:fs';
 import path from 'node:path';
 import { once } from 'node:events';
@@ -295,6 +297,9 @@ async function main() {
       (k) => Math.abs(counts[k] - EXPECTED[k]) / EXPECTED[k] > 0.01,
     );
     log(`done: ${JSON.stringify(counts)}`);
+    // «بورس‌ها» from the loaded shops (lib/data/hubs.ts + data/hubs.curated.json)
+    const hubs = await rebuildHubs();
+    log(`hubs: ${hubs.length} (${hubs.filter((h) => h.source !== 'curated').length} from the data)`);
     if (bad.length) throw new Error(`row counts deviate >1% from expected ${JSON.stringify(EXPECTED)}: ${bad.join(', ')}`);
   } catch (err) {
     await client.query('ROLLBACK').catch(() => {});
@@ -302,6 +307,7 @@ async function main() {
   } finally {
     client.release();
     await pool.end();
+    await appPool.end().catch(() => {});
   }
 }
 

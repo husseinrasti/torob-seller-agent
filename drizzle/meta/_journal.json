@@ -29,6 +29,13 @@
       "when": 1792734414288,
       "tag": "0003_users_chats",
       "breakpoints": true
+    },
+    {
+      "idx": 4,
+      "version": "7",
+      "when": 1792772232694,
+      "tag": "0004_hubs",
+      "breakpoints": true
     }
   ]
 }
