@@ -9,7 +9,7 @@ import { positionOf, priceStats, type Position, type PriceStats } from '../searc
 import { resolveBasketItem } from '../plan/basket-service';
 import { NOT_RECOGNIZED, recognized, shelfPrice, visionLabel, visionQuery, type Vision } from './parse';
 
-export const PHOTO_PRIVACY = 'عکس فقط برای تشخیص کالا به ارائه‌دهنده‌ی مدل فرستاده شد و جایی ذخیره نمی‌شود.';
+export const PHOTO_PRIVACY = 'عکس فقط برای تشخیص به مدل فرستاده شد و ذخیره نمی‌شود.';
 
 /** What the client sends back after /api/vision/identify (bounded; never the image itself). */
 export const VisionInput = z.object({

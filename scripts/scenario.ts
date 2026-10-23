@@ -109,20 +109,32 @@ async function main() {
   await snap(page, 'sellers', 'section[aria-busy]');
   await snap(page, 'seller-cards', 'article[id^="shop-"]', 'first');
 
-  // F10) trust signals: «کامل بودن اطلاعات» on every card, the website button, both payment wordings
+  // F10) trust signals: compact completeness dots on every card; website and payment channel in «جزئیات»
   await page.getByRole('button', { name: /نمایش همه/ }).last().click().catch(() => {});
   await page.waitForTimeout(300);
-  const trustRows = await page.locator('[data-trust-row]').count();
-  const webCard = page.locator('article[id^="shop-"]', { hasText: 'گوشی مارکت' }).first();
-  const webLink = await webCard.getByRole('link', { name: 'وب‌سایت' }).getAttribute('href').catch(() => null);
-  const declared = await page.locator('article[id^="shop-"]', { hasText: 'آروان دیسین' }).first().innerText().catch(() => '');
+  const trustDots = await page.locator('article[id^="shop-"] [data-trust]').count();
+  const openDetails = async (name: string) => {
+    const card = page.locator('article[id^="shop-"]', { hasText: name }).first();
+    await card.locator('[data-more]').click();
+    await card.getByRole('button', { name: 'جزئیات' }).click();
+    const sheet = page.locator('[data-shop-trust]').last();
+    await sheet.waitFor({ timeout: 20_000 });
+    return sheet;
+  };
+  let sheet = await openDetails('آروان دیسین');
+  const declared = await sheet.innerText();
+  await page.keyboard.press('Escape');
+  await page.waitForTimeout(400);
+  sheet = await openDetails('گوشی مارکت');
+  const webLink = await sheet.getByRole('link', { name: 'وب‌سایت' }).getAttribute('href').catch(() => null);
   check(
-    'F10. trust signals on seller cards (completeness, website, payment channel)',
-    trustRows >= 10 && Boolean(webLink?.startsWith('http')) && /پرداخت اعتباری اعلام‌شده \(کانال نامشخص\)/.test(declared),
-    `${trustRows} cards · ${webLink}`,
+    'F10. trust signals: dots on cards; website and payment channel in «جزئیات»',
+    trustDots >= 10 && Boolean(webLink?.startsWith('http')) && /پرداخت اعتباری اعلام‌شده \(کانال نامشخص\)/.test(declared),
+    `${trustDots} cards · ${webLink}`,
   );
-  await webCard.getByRole('button', { name: /کامل بودن اطلاعات/ }).click();
-  await snapAs(page, '24-trust-signals', 'article[id^="shop-"]:has-text("گوشی مارکت")');
+  await snapAs(page, '24-trust-signals');
+  await page.keyboard.press('Escape');
+  await page.waitForTimeout(400);
 
 
   // 3a) map with every shop of the area + numbered sellers; tapping a seller opens its details
@@ -422,8 +434,7 @@ async function main() {
   let d = await decisionFor('2026-10-25T23:30', 'ساعت ۱۱:۳۰ شب، شارژر گوشی می‌خوام نزدیک میدان هفت تیر');
   const s1 = await d.innerText();
   check('S1. night: T1 empty (said), bazaar card, earliest opening, map with hub', /هیچ فروشنده‌ی ثبت‌شده/.test(await tierText(d, 'open_listed_near')) && /بورس موبایل جمهوری/.test(s1) && /فردا/.test(await tierText(d, 'opens_soonest')) && (await d.locator('.hk-dm-hub').count()) >= 1 && (await d.locator('.hk-dm-user').count()) === 1, (await d.getAttribute('data-recommended')) ?? '');
-  const reply = (await page.locator('[data-role="assistant"]').last().innerText()).split('\n').filter((l) => l.trim() && !/دستیار هوشمند|حالت ساده/.test(l)).pop() ?? '';
-  check('S1. agent text ≤ 2 sentences', reply.split(/[.؟!](?:\s|$)/).filter((x) => x.trim()).length <= 2, reply.slice(0, 120));
+  check('S1. the map card is the answer: no extra agent prose', (await page.locator('[data-role="assistant"]').last().locator('[data-agent-text]').count()) === 0);
   await snapAs(page, '24-decision-night', '[data-decision]');
 
   // S2 18:40: open near with «عجله کن», later-closing ones farther; the time scrubber moves the verdict
@@ -441,12 +452,12 @@ async function main() {
   // S3 Friday noon at سهروردی: Friday closures, no invented open shop, the next opening after Friday
   d = await decisionFor('2026-10-30T11:00', 'جمعه ظهر هدفون می‌خوام نزدیک سهروردی');
   const s3 = await d.innerText();
-  check('S3. Friday: «جمعه N٪ … تعطیل», next opening after Friday', /جمعه [۰-۹]+٪/.test(s3) && /(?:شنبه|یکشنبه) [۰-۹]{2}:[۰-۹]{2}/.test(await tierText(d, 'opens_soonest')), (await d.locator('[data-decision-verdict]').innerText()).slice(0, 100));
+  check('S3. Friday: «جمعه N٪ … تعطیل», next opening after Friday', /جمعه [۰-۹]+٪/.test(s3) && /(?:فردا|شنبه|یکشنبه) [۰-۹]{2}:[۰-۹]{2}/.test(await tierText(d, 'opens_soonest')), (await d.locator('[data-decision-verdict]').innerText()).slice(0, 100));
   await snapAs(page, '27-decision-friday', '[data-decision]');
 
   // S4 «۱۵ دقیقه دیگه قطار دارم» at فردوسی: walking, 600 m, nearest open first
   d = await decisionFor('2026-10-25T16:00', 'کابل تایپ‌سی، ۱۵ دقیقه دیگه قطار دارم');
-  check('S4. train in 15 min: walking, 600 m, nearest open first', (await d.locator('[data-seg="transport:walk"][aria-checked="true"]').count()) === 1 && /۶۰۰ متر/.test(await d.locator('[data-decision-verdict]').innerText()) && (await d.getAttribute('data-recommended')) === 'open_listed_near', await d.locator('[data-decision-verdict]').innerText());
+  check('S4. train in 15 min: walking, 600 m, nearest open first', (await d.locator('[data-seg="transport:walk"][aria-checked="true"]').count()) === 1 && (await d.getAttribute('data-radius-m')) === '600' && (await d.getAttribute('data-recommended')) === 'open_listed_near', await d.locator('[data-decision-verdict]').innerText());
 
   return finish();
 

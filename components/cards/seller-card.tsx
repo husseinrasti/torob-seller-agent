@@ -1,7 +1,7 @@
 'use client';
 
 import { useState } from 'react';
-import { Handshake, Info, ListPlus, ListChecks, MessageCircle, MessageSquareText, MoreHorizontal, Navigation, Phone, PhoneCall, Sparkles } from 'lucide-react';
+import { Handshake, Info, ListPlus, ListChecks, MessageCircle, MessageSquareText, MoreHorizontal, Navigation, Phone, PhoneCall } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { cn } from '@/lib/utils';
 import { formatDistance } from '@/lib/fa/format';
@@ -9,9 +9,9 @@ import { toFaDigits } from '@/lib/fa/digits';
 import type { SellerRow } from '@/lib/search/sellers';
 import { useChatActions } from '@/components/app/chat-actions';
 import { useSession } from '@/components/app/session-context';
-import { AvailabilityBadge, ConditionChips, FreshnessBadge, MallChip, OpenDot, PriceLine, type Availability } from './badges';
+import { AvailabilityBadge, FreshnessBadge, MallChip, OpenDot, PriceLine, type Availability } from './badges';
 import { ShopDetailsSheet } from './shop-details-sheet';
-import { ShopFacts, TrustDots, TrustLinks } from './trust';
+import { TrustDots } from './trust';
 import { SellerMessageSheet } from './seller-message';
 
 export function SellerCard({ row, rank, availability, productTitle }: { row: SellerRow; rank: number; availability: Availability; productTitle?: string }) {
@@ -52,6 +52,7 @@ export function SellerCard({ row, rank, availability, productTitle }: { row: Sel
       <div className="mt-1.5 flex flex-wrap items-center gap-x-3 gap-y-1">
         <OpenDot open={row.open} />
         <MallChip mall={row.mall} />
+        {row.trust && <TrustDots trust={row.trust} compact className="ms-auto" />}
       </div>
       {!row.mall?.name && <p className="mt-1 truncate text-[11px] text-muted-foreground">{row.address_short}</p>}
 
@@ -71,26 +72,7 @@ export function SellerCard({ row, rank, availability, productTitle }: { row: Sel
         </dd>
       </dl>
 
-      <div className="mt-2 flex flex-wrap gap-1">
-        <ConditionChips c={row.conditions} />
-      </div>
-
-      {row.trust && (
-        <div data-trust-row className="mt-2 space-y-1">
-          <div className="flex flex-wrap items-center justify-between gap-1.5">
-            <TrustDots trust={row.trust} />
-            <TrustLinks trust={row.trust} />
-          </div>
-          <ShopFacts hoursKnown={row.hours_known} payment={row.payment ?? []} sameCategory={row.same_category_count ?? null} />
-        </div>
-      )}
-
-      {row.why.length > 0 && (
-        <p className="mt-2 flex items-start gap-1 text-xs leading-5 text-primary">
-          <Sparkles className="mt-0.5 size-3.5 shrink-0" />
-          {row.why.join(' · ')}
-        </p>
-      )}
+      {/* conditions, website/Instagram, payment channel and «why» live in «جزئیات» */}
       {askChannel ? (
         <div className="mt-2.5 space-y-2">
           <p className="text-[11px] text-muted-foreground">همراه خرید بپرسد (شبیه‌سازی‌شده) یا خودتان پیام بدهید:</p>
@@ -166,7 +148,7 @@ export function SellerCard({ row, rank, availability, productTitle }: { row: Sel
         </>
       )}
       {myMessage && <SellerMessageSheet offerId={row.offer_id} onClose={() => setMyMessage(false)} />}
-      <ShopDetailsSheet open={details} onOpenChange={setDetails} shopId={row.shop_id} productId={row.product_id} score={row.score_breakdown} />
+      <ShopDetailsSheet open={details} onOpenChange={setDetails} shopId={row.shop_id} productId={row.product_id} score={row.score_breakdown} why={row.why} conditions={row.conditions} />
     </article>
   );
 }

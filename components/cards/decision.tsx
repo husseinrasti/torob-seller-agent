@@ -2,7 +2,7 @@
 
 import { useCallback, useMemo, useRef, useState } from 'react';
 import dynamic from 'next/dynamic';
-import { ArrowLeftRight, BellPlus, Building2, Clock3, HelpCircle, Loader2, MessageCircleQuestion, Navigation, Store } from 'lucide-react';
+import { ArrowLeftRight, BellPlus, Building2, ChevronDown, Clock3, HelpCircle, Loader2, MessageCircleQuestion, Navigation, Store } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Skeleton } from '@/components/ui/skeleton';
 import { cn } from '@/lib/utils';
@@ -74,7 +74,7 @@ function ShopLine({ s, onOpen }: { s: ShopPick; onOpen: () => void }) {
   );
 }
 
-function HubBlock({ h, need, offsetMin, families }: { h: HubPick; need: string; offsetMin: number; families: string[] }) {
+function HubBlock({ h, offsetMin, families }: { h: HubPick; offsetMin: number; families: string[] }) {
   const { api } = useSession();
   const [list, setList] = useState<HubShopRow[] | null>(null);
   const [loading, setLoading] = useState(false);
@@ -99,10 +99,10 @@ function HubBlock({ h, need, offsetMin, families }: { h: HubPick; need: string; 
           {h.open_share !== null && ` · این ساعت ${toFaDigits(Math.round(h.open_share * 100))}٪ باز`}
         </p>
         {h.source === 'curated' ? (
-          <p className="text-[11px] text-recent">بر اساس شناخت عمومی، نه داده ترب{h.note ? ` — ${h.note}` : ''}</p>
+          <p className="text-[11px] text-recent">بر اساس شناخت عمومی، نه داده ترب</p>
         ) : (
-          <p className="text-[11px] text-muted-foreground">
-            {toFaDigits(h.shop_count)} مغازه‌ی هم‌نوع در داده‌ها، {toFaDigits(h.category_only_count)} تا بدون کالای ثبت‌شده — شاید {need} داشته باشند{h.note ? ` · ${h.note}` : ''}
+          <p className="text-[11px] text-muted-foreground" title={h.note ?? undefined}>
+            {toFaDigits(h.shop_count)} مغازه · {toFaDigits(h.category_only_count)} بدون کالای ثبت‌شده در ترب
           </p>
         )}
       </div>
@@ -138,6 +138,7 @@ function HubBlock({ h, need, offsetMin, families }: { h: HubPick; need: string; 
 
 function TierCard({ t, rec, data, offsetMin, onShop }: { t: Tier; rec: boolean; data: DecisionOutput; offsetMin: number; onShop: (s: ShopPick) => void }) {
   const { sendAction, busy } = useChatActions();
+  const [open, setOpen] = useState(rec);
   if (t.empty) {
     return (
       <li data-tier={t.key} data-tier-empty className="flex items-start gap-2 px-1 text-xs leading-6 text-muted-foreground">
@@ -148,6 +149,18 @@ function TierCard({ t, rec, data, offsetMin, onShop }: { t: Tier; rec: boolean; 
   }
   const first = t.shops[0];
   const asks = t.shops.filter((s) => s.offer_id).slice(0, 3);
+  // other tiers stay one line until tapped
+  if (!open) {
+    return (
+      <li data-tier={t.key} className="rounded-2xl bg-muted/40">
+        <button onClick={() => setOpen(true)} className="flex w-full items-center gap-2 px-3 py-2.5 text-start">
+          <span className="shrink-0 text-xs font-semibold">{t.title}</span>
+          <span className="line-clamp-1 min-w-0 flex-1 text-[11px] text-muted-foreground">{t.verdict}</span>
+          <ChevronDown className="size-4 shrink-0 text-muted-foreground" />
+        </button>
+      </li>
+    );
+  }
   return (
     <li data-tier={t.key} data-recommended={rec || undefined} className={cn('space-y-2 rounded-2xl p-3 transition-colors', rec ? 'bg-accent/50 ring-1 ring-primary/30' : 'bg-muted/40')}>
       <div className="flex items-center justify-between gap-2">
@@ -160,7 +173,7 @@ function TierCard({ t, rec, data, offsetMin, onShop }: { t: Tier; rec: boolean; 
       {/* the recommended tier's verdict is the card's headline already */}
       {!rec && <p className="text-xs leading-6">{t.verdict}</p>}
       {t.hubs.slice(0, 1).map((h) => (
-        <HubBlock key={h.hub_id} h={h} need={data.need} offsetMin={offsetMin} families={data.need_spec.families} />
+        <HubBlock key={h.hub_id} h={h} offsetMin={offsetMin} families={data.need_spec.families} />
       ))}
       {t.shops.length > 0 && (
         <div className="divide-y">
@@ -257,7 +270,7 @@ export function DecisionCard({ output }: { output: DecisionOutput }) {
   ];
 
   return (
-    <section data-decision data-recommended={data.recommended ?? ''} className="@container overflow-hidden rounded-3xl border bg-card">
+    <section data-decision data-recommended={data.recommended ?? ''} data-radius-m={data.radius_m} className="@container overflow-hidden rounded-3xl border bg-card">
       <div className="relative h-72 @2xl:h-96">
         <DecisionMap decision={data} center={data.location} target={target} onShop={setShop} />
         <span className="pointer-events-none absolute end-3 top-3 z-10 inline-flex items-center gap-1 rounded-full bg-background/90 px-2.5 py-1 text-[11px] font-medium shadow-xs">
@@ -269,9 +282,9 @@ export function DecisionCard({ output }: { output: DecisionOutput }) {
       <div className={cn('space-y-3 p-4 transition-opacity', loading && 'opacity-60')}>
         <div className="space-y-1">
           <p data-decision-verdict className="text-[15px] font-semibold leading-7">
-            {data.verdict}
+            {data.headline}
           </p>
-          {data.tradeoffs.slice(0, 2).map((x) => (
+          {data.tradeoffs.slice(0, 1).map((x) => (
             <p key={x} className="flex items-start gap-1.5 text-xs leading-6 text-muted-foreground">
               <ArrowLeftRight className="mt-1 size-3.5 shrink-0" />
               {x}
@@ -322,7 +335,9 @@ export function DecisionCard({ output }: { output: DecisionOutput }) {
         </div>
 
         <ol className="space-y-2" data-tiers>
-          {data.tiers.map((t) => (
+          {data.tiers
+            .filter((t) => !t.empty || t.key === 'open_listed_near' || t.key === 'open_listed_far')
+            .map((t) => (
             <TierCard key={`${t.key}:${data.at}:${data.radius_m}`} t={t} rec={t.key === data.recommended} data={data} offsetMin={offset} onShop={setShop} />
           ))}
         </ol>

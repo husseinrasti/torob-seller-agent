@@ -64,7 +64,7 @@ function ToolSkeleton({ name }: { name: string }) {
 function AssistantText({ text }: { text: string }) {
   if (!text.trim()) return null;
   return (
-    <div className="flex items-start gap-2">
+    <div className="flex items-start gap-2" data-agent-text>
       <span className="mt-0.5 flex size-7 shrink-0 items-center justify-center rounded-full bg-primary/10 text-primary">
         <Bot className="size-4" />
       </span>
@@ -137,7 +137,7 @@ const AssistantMessage = memo(function AssistantMessage({
         }
         if (part.type === 'data-notice') {
           return (
-            <p key={i} className="rounded-xl bg-recent-bg px-3 py-2 text-xs leading-5 text-recent">
+            <p key={i} className="text-[11px] text-muted-foreground">
               {(part as { data?: { text?: string } }).data?.text}
             </p>
           );

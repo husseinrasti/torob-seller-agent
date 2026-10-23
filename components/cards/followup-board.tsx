@@ -22,7 +22,7 @@ const resolved = (i: FollowupItem) => i.status !== 'contacting' && i.status !== 
 function Transcript({ item }: { item: FollowupItem }) {
   if (!item.transcript?.length) return null;
   return (
-    <Collapsible defaultOpen={item.status === 'out_of_stock' || item.status === 'price_changed'}>
+    <Collapsible>
       <CollapsibleTrigger className="tap flex h-8 items-center gap-1 text-xs text-primary">
         <ChevronDown className="size-3.5" />
         متن {item.channel === 'call' ? 'تماس' : 'گفتگو'}

@@ -1,7 +1,8 @@
 'use client';
 
 import { useEffect, useMemo, useRef, useState } from 'react';
-import { Info, MapPinned, Sparkles, ThumbsUp, TriangleAlert, X } from 'lucide-react';
+import { ChevronDown, Clock3, Info, MapPinned, Sparkles, ThumbsUp, TriangleAlert, X } from 'lucide-react';
+import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/components/ui/collapsible';
 import { cn } from '@/lib/utils';
 import { faText, formatDistance, formatToman } from '@/lib/fa/format';
 import { toFaDigits } from '@/lib/fa/digits';
@@ -136,7 +137,7 @@ export function MissionResultCard({ output, toolCallId }: { output: MissionResul
           <Sparkles className="size-4 text-primary" />
           گزارش مأموریت
         </h3>
-        <p className="text-[11px] text-muted-foreground">این‌طور فهمیدم (برای حذف هر شرط و بررسی دوباره، × را بزنید):</p>
+        <p className="text-[11px] text-muted-foreground">این‌طور فهمیدم:</p>
         <ul className="flex flex-wrap gap-1.5" aria-label="این‌طور فهمیدم">
           {output.understood.map((u) => {
             const drop = DROP_KEY[u.key];
@@ -285,10 +286,20 @@ export function MissionResultCard({ output, toolCallId }: { output: MissionResul
         </>
       )}
 
+      {/* opening-hours chart on demand: one line by default */}
       {output.visit_time && (
-        <div className="border-t p-3">
-          <VisitTimeCard output={output.visit_time} />
-        </div>
+        <Collapsible className="border-t">
+          <CollapsibleTrigger className="flex h-11 w-full items-center justify-between px-3 text-xs">
+            <span className="flex items-center gap-1.5">
+              <Clock3 className="size-3.5 text-primary" />
+              کی برم؟ ساعت کاری این فروشنده‌ها
+            </span>
+            <ChevronDown className="size-4 text-muted-foreground" />
+          </CollapsibleTrigger>
+          <CollapsibleContent className="px-3 pb-3">
+            <VisitTimeCard output={output.visit_time} />
+          </CollapsibleContent>
+        </Collapsible>
       )}
 
       {output.plan && (

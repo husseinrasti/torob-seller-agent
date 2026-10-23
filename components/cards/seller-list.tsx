@@ -1,10 +1,9 @@
 'use client';
 
 import { useEffect, useMemo, useRef, useState } from 'react';
-import { Building2, ChevronDown, Clock3, Filter, Loader2, MapPinned, Store, X } from 'lucide-react';
+import { Building2, ChevronDown, Clock3, Filter, Loader2, MapPinned, X } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/components/ui/collapsible';
-import { ToggleGroup, ToggleGroupItem } from '@/components/ui/toggle-group';
 import { cn } from '@/lib/utils';
 import { faText, formatDistance, formatTomanShort } from '@/lib/fa/format';
 import { toFaDigits } from '@/lib/fa/digits';
@@ -32,7 +31,6 @@ function sameParams(a: ReturnType<typeof paramsOf>, b: SellersResult['params']):
 export function SellerList({ output, isLatest, toolCallId }: { output: SellersOutput; isLatest: boolean; toolCallId: string }) {
   const { state, patch, setLatestSellers } = useSession();
   const { updateToolOutput, sendAction, busy } = useChatActions();
-  const [refreshed, setRefreshed] = useState(false);
   const followups = useFollowups();
   const [data, setData] = useState<SellersResult>(output);
   const [loading, setLoading] = useState(false);
@@ -63,7 +61,6 @@ export function SellerList({ output, isLatest, toolCallId }: { output: SellersOu
         if (my === reqId.current) {
           setData(d);
           setMall(null);
-          setRefreshed(true);
           // keep the chat history in sync so the agent reasons about the list the user sees
           updateToolOutput(toolCallId, { ...output, ...d });
         }
@@ -97,7 +94,6 @@ export function SellerList({ output, isLatest, toolCallId }: { output: SellersOu
               {toFaDigits(data.count)} فروشنده در شعاع {formatDistance(data.params.radius_m)}
             </h3>
             {productTitle && <p className="line-clamp-1 text-xs text-muted-foreground">{productTitle}</p>}
-            {refreshed && <p className="mt-0.5 text-[11px] text-primary">فهرست با تنظیمات جدید به‌روز شد</p>}
           </div>
           <div className="flex shrink-0 items-center gap-1.5">
             {isLatest && data.count > 0 && (
@@ -110,7 +106,7 @@ export function SellerList({ output, isLatest, toolCallId }: { output: SellersOu
                 کی برم؟
               </button>
             )}
-            {loading ? <Loader2 className="size-5 animate-spin text-primary" /> : <Store className="size-5 text-muted-foreground" />}
+            {loading && <Loader2 className="size-5 animate-spin text-primary" />}
           </div>
         </div>
         {activeFilters.length > 0 && (
@@ -159,11 +155,19 @@ export function SellerList({ output, isLatest, toolCallId }: { output: SellersOu
             نمای داخل پاساژ (طبقه‌به‌طبقه)
           </button>
         )}
-        <ToggleGroup type="single" value={sort} onValueChange={(v) => v && setSort(v as Sort)} variant="outline" size="sm" className="w-full">
-          <ToggleGroupItem value="score" className="h-9 flex-1 text-xs">بهترین امتیاز</ToggleGroupItem>
-          <ToggleGroupItem value="price" className="h-9 flex-1 text-xs">ارزان‌ترین</ToggleGroupItem>
-          <ToggleGroupItem value="distance" className="h-9 flex-1 text-xs">نزدیک‌ترین</ToggleGroupItem>
-        </ToggleGroup>
+        <div role="radiogroup" aria-label="ترتیب" className="inline-flex rounded-full bg-muted p-0.5">
+          {(
+            [
+              ['score', 'بهترین'],
+              ['price', 'ارزان‌ترین'],
+              ['distance', 'نزدیک‌ترین'],
+            ] as Array<[Sort, string]>
+          ).map(([v, label]) => (
+            <button key={v} role="radio" aria-checked={sort === v} onClick={() => setSort(v)} className={cn('h-8 rounded-full px-3 text-xs', sort === v ? 'bg-background font-semibold shadow-xs' : 'text-muted-foreground')}>
+              {label}
+            </button>
+          ))}
+        </div>
       </header>
 
       {(data.count < 3 || data.relaxations.length > 0) && (data.relaxations.length > 0 || data.radius_suggestion || data.count === 0) && (

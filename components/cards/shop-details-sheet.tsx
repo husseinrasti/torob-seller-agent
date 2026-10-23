@@ -10,10 +10,12 @@ import { Sheet, SheetContent, SheetDescription, SheetHeader, SheetTitle } from '
 import { Skeleton } from '@/components/ui/skeleton';
 import { faText, formatToman } from '@/lib/fa/format';
 import { toFaDigits } from '@/lib/fa/digits';
-import type { ShopDetails } from '@/lib/search/sellers';
+import type { SellerRow, ShopDetails } from '@/lib/search/sellers';
+
+type Conditions = SellerRow['conditions'];
 import { FACTOR_LABEL, type Breakdown, type Weights } from '@/lib/search/score';
 import { useSession } from '@/components/app/session-context';
-import { AvailabilityBadge, FreshnessBadge, MallChip, OpenDot, PriceLine } from './badges';
+import { AvailabilityBadge, ConditionChips, FreshnessBadge, MallChip, OpenDot, PriceLine } from './badges';
 import { ShopTypeBadge } from '@/components/map/shop-type-icon';
 import { ShopFacts, TrustDots, TrustLinks } from './trust';
 import { BargainCard } from './bargain';
@@ -28,12 +30,17 @@ export function ShopDetailsSheet({
   shopId,
   productId,
   score,
+  why,
+  conditions,
 }: {
   open: boolean;
   onOpenChange: (v: boolean) => void;
   shopId: string;
   productId?: string;
   score?: Breakdown;
+  /** the seller row's «why» line and purchase conditions (moved off the card) */
+  why?: string[];
+  conditions?: Conditions;
 }) {
   const { state, patch, api } = useSession();
   const chat = useContext(ChatActionsContext);
@@ -163,6 +170,11 @@ export function ShopDetailsSheet({
                   <p className="text-xs text-muted-foreground">{data.today_hours}</p>
                 </div>
               </section>
+              {conditions && (
+                <section className="flex flex-wrap gap-1" data-shop-conditions>
+                  <ConditionChips c={conditions} />
+                </section>
+              )}
               <section data-shop-trust className="space-y-1.5 rounded-xl border p-2.5">
                 <div className="flex flex-wrap items-center justify-between gap-2">
                   <TrustDots trust={data.trust} />
@@ -183,6 +195,7 @@ export function ShopDetailsSheet({
               {score && (
                 <section>
                   <h5 className="mb-1.5 text-xs font-semibold">چرا این رتبه؟ (سهم هر معیار در امتیاز)</h5>
+                  {why?.length ? <p className="mb-1.5 text-xs text-primary">{why.join(' · ')}</p> : null}
                   <div className="space-y-1">
                     {FACTORS.map(([k, label]) => (
                       <div key={k} className="flex items-center gap-2 text-xs">

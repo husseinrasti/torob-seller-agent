@@ -146,7 +146,8 @@ const SITUATIONS: Situ[] = [
       ['the moment is Friday 13:00', /جمعه ۱۳:۰۰/.test(d.at_label) && Boolean(sit.at), d.at_label],
       ['Friday closures said («جمعه N٪ … تعطیل»)', /جمعه [۰-۹]+٪/.test(d.day_note ?? ''), d.day_note ?? ''],
       ['nothing open near is invented', tier(d, 'open_listed_near').shops.every((s) => s.open.open === true && s.open.known), tier(d, 'open_listed_near').verdict],
-      ['the earliest opening is after Friday', /شنبه|یکشنبه/.test(tier(d, 'opens_soonest').shops[0]?.opens?.label ?? ''), tier(d, 'opens_soonest').verdict],
+      // from Friday «فردا» is Saturday
+      ['the earliest opening is after Friday', /فردا|شنبه|یکشنبه/.test(tier(d, 'opens_soonest').shops[0]?.opens?.label ?? ''), tier(d, 'opens_soonest').verdict],
     ],
   },
   {

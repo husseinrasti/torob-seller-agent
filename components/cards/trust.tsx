@@ -7,7 +7,7 @@ import { toFaDigits } from '@/lib/fa/digits';
 import { paymentWording, type PaymentOption, type Trust } from '@/lib/data/trust';
 
 /** «کامل بودن اطلاعات» as three dots; tapping shows why (it is not a rating of the shop). */
-export function TrustDots({ trust, className }: { trust: Trust; className?: string }) {
+export function TrustDots({ trust, className, compact }: { trust: Trust; className?: string; compact?: boolean }) {
   const [open, setOpen] = useState(false);
   return (
     <div className={cn('text-[11px]', className)}>
@@ -16,7 +16,8 @@ export function TrustDots({ trust, className }: { trust: Trust; className?: stri
         onClick={() => setOpen((v) => !v)}
         aria-expanded={open}
         title={trust.reasons.map((r) => r.label).join(' · ')}
-        className="inline-flex h-7 items-center gap-1.5 rounded-full text-muted-foreground"
+        aria-label={`کامل بودن اطلاعات ${toFaDigits(trust.score)} از ۳`}
+        className="tap inline-flex h-7 items-center gap-1.5 rounded-full text-muted-foreground"
         data-trust={trust.score}
       >
         <span className="inline-flex gap-0.5" aria-hidden>
@@ -24,11 +25,16 @@ export function TrustDots({ trust, className }: { trust: Trust; className?: stri
             <span key={i} className={cn('size-2 rounded-full', i < trust.score ? 'bg-primary' : 'bg-muted-foreground/25')} />
           ))}
         </span>
-        کامل بودن اطلاعات {toFaDigits(trust.score)} از ۳
-        <span className="text-primary underline underline-offset-2">چرا؟</span>
+        {!compact && (
+          <>
+            کامل بودن اطلاعات {toFaDigits(trust.score)} از ۳
+            <span className="text-primary underline underline-offset-2">چرا؟</span>
+          </>
+        )}
       </button>
       {open && (
         <ul className="mt-1 space-y-0.5 rounded-lg bg-muted/60 p-2">
+          {compact && <li className="font-medium">کامل بودن اطلاعات {toFaDigits(trust.score)} از ۳</li>}
           {trust.reasons.map((r) => (
             <li key={r.key} className="flex items-center gap-1.5">
               {r.ok ? <Check className="size-3 text-fresh" /> : <X className="size-3 text-muted-foreground" />}

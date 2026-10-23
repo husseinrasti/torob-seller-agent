@@ -6,7 +6,7 @@ import type { FollowupStatus } from '../agent/state';
 import { followupResult, groundTruth } from './seller';
 import { sellerTranscript, templateTranscript, type TranscriptLine } from './persona';
 
-export const SIM_DISCLAIMER = 'شبیه‌سازی‌شده — در نسخه واقعی از طریق پیام‌رسان/تماس ترب انجام می‌شود.';
+export const SIM_DISCLAIMER = 'پیگیری‌ها شبیه‌سازی‌شده‌اند.';
 
 export type FollowupItem = {
   id: string;
