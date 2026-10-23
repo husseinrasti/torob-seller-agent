@@ -13,15 +13,23 @@ export type Route = {
   source: 'llm' | 'rules';
   /** candidate categories with vote share, for debugging / the LLM */
   candidates: Array<{ name: string; share: number }>;
+  /** true when `budget` was parsed from the text itself */
+  textBudget?: boolean;
 };
 
 const cache = new Map<string, Route>();
 const CACHE_MAX = 500;
 
-function remember(key: string, r: Route): Route {
+/** Cached routes are hint-free (the text decides); a caller's budget hint is applied on the way out. */
+function remember(key: string, r: Route, hints: { budget?: Budget }): Route {
   if (cache.size >= CACHE_MAX) cache.delete(cache.keys().next().value!);
   cache.set(key, r);
-  return r;
+  return withHints(r, hints);
+}
+
+/** Budget priority: an amount in the text > the caller's hint > the routing model's reading. */
+function withHints(r: Route, hints: { budget?: Budget }): Route {
+  return r.textBudget ? r : { ...r, budget: hints.budget ?? r.budget };
 }
 
 /** Category votes from the best-matching products, plus category-name matches. */
@@ -68,19 +76,20 @@ export async function routeCategories(userText: string, hints: { budget?: Budget
   const pq = parseQuery(userText);
   const key = pq.norm;
   const hit = cache.get(key);
-  if (hit) return hit;
+  if (hit) return withHints(hit, hints);
 
   const candidates = await categoryCandidates(pq.keywords, pq.tokens);
   const rules: Route = {
     categories: rulesPick(candidates),
     keywords: pq.keywords,
-    budget: pq.budget ?? hints.budget,
+    budget: pq.budget,
+    textBudget: Boolean(pq.budget),
     mustHave: [],
     source: 'rules',
     candidates,
   };
   const confident = candidates.length > 0 && candidates[0].share >= 0.6;
-  if (confident || !candidates.length || !llmConfigured() || process.env.LLM_ROUTING === 'off') return remember(key, rules);
+  if (confident || !candidates.length || !llmConfigured() || process.env.LLM_ROUTING === 'off') return remember(key, rules, hints);
 
   try {
     const { output } = await generateText({
@@ -98,20 +107,23 @@ export async function routeCategories(userText: string, hints: { budget?: Budget
     });
     const valid = new Set(candidates.map((c) => c.name));
     const cats = output.categories.filter((c) => valid.has(c));
+    // the model may invent a budget (e.g. its prompt example) — only trust it when the text names an amount
+    const saysAmount = /[0-9۰-۹]|میلیون|ملیون|میلیارد|هزار|تومن|تومان/u.test(userText);
     const llmBudget: Budget | undefined =
-      output.budget_max_toman || output.budget_min_toman
+      saysAmount && (output.budget_max_toman || output.budget_min_toman)
         ? { min: output.budget_min_toman ?? undefined, max: output.budget_max_toman ?? undefined }
         : undefined;
     return remember(key, {
       categories: cats.length ? cats : rules.categories,
       keywords: parseQuery(output.keywords || pq.keywords).keywords || pq.keywords,
-      budget: pq.budget ?? llmBudget ?? hints.budget,
+      budget: pq.budget ?? llmBudget,
+      textBudget: Boolean(pq.budget),
       mustHave: output.must_have,
       source: 'llm',
       candidates,
-    });
+    }, hints);
   } catch (err) {
     console.warn('[routeCategories] LLM failed, using rules:', (err as Error).message);
-    return remember(key, rules);
+    return remember(key, rules, hints);
   }
 }
