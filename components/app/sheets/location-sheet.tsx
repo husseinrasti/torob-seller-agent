@@ -11,7 +11,7 @@ import { LazyMap } from '@/components/map/lazy-map';
 import { useSession } from '../session-context';
 import { BottomSheet } from './bottom-sheet';
 
-type Place = { name: string; kind: 'area' | 'mall'; lat: number; lon: number; shops: number };
+type Place = { name: string; kind: 'area' | 'mall' | 'gazetteer'; lat: number; lon: number; shops: number };
 
 export function LocationSheet({ open, onOpenChange }: { open: boolean; onOpenChange: (v: boolean) => void }) {
   const { state, patch } = useSession();
@@ -110,7 +110,9 @@ export function LocationSheet({ open, onOpenChange }: { open: boolean; onOpenCha
                 >
                   {p.kind === 'mall' ? <Building2 className="size-4 text-muted-foreground" /> : <MapPin className="size-4 text-muted-foreground" />}
                   <span className="flex-1">{p.name}</span>
-                  <span className="text-[11px] text-muted-foreground">{toFaDigits(p.shops)} فروشگاه</span>
+                  <span className={`text-[11px] ${p.kind === 'gazetteer' && p.shops === 0 ? 'text-recent' : 'text-muted-foreground'}`}>
+                    {p.kind === 'gazetteer' ? (p.shops ? `${toFaDigits(p.shops)} فروشگاه در ۱ کیلومتری` : 'فروشگاهی در ۱ کیلومتری ثبت نشده') : `${toFaDigits(p.shops)} فروشگاه`}
+                  </span>
                 </button>
               </li>
             ))}
