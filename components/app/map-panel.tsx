@@ -10,7 +10,7 @@ export function MapPanel() {
   if (!state) return null;
   return (
     <div className="border-b bg-background px-4 pb-3">
-      <ShopsMap className="h-72 w-full rounded-2xl border" />
+      <ShopsMap className="h-80 w-full rounded-2xl border" />
     </div>
   );
 }
@@ -23,7 +23,7 @@ export function MapColumn() {
     <div className="flex h-full min-h-0 flex-col">
       <div className="border-b px-4 py-3">
         <h2 className="text-sm font-bold">نقشه فروشگاه‌ها</h2>
-        <p className="line-clamp-1 text-xs text-muted-foreground">{title ? `فروشنده‌های «${title}» و بقیه فروشگاه‌های محدوده` : 'همه فروشگاه‌های محدوده — روی هر نقطه بزنید'}</p>
+        <p className="line-clamp-1 text-xs text-muted-foreground">{title ? `فروشنده‌های «${title}» و بقیه فروشگاه‌های محدوده` : 'همه فروشگاه‌های محدوده — روی هر نماد بزنید'}</p>
       </div>
       <ShopsMap className="min-h-0 flex-1" />
     </div>

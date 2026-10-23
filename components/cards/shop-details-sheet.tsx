@@ -14,6 +14,8 @@ import type { ShopDetails } from '@/lib/search/sellers';
 import type { Breakdown } from '@/lib/search/score';
 import { useSession } from '@/components/app/session-context';
 import { AvailabilityBadge, FreshnessBadge, MallChip, OpenDot, PriceLine } from './badges';
+import { ShopTypeBadge } from '@/components/map/shop-type-icon';
+import { shopTypeLabel } from '@/lib/data/shop-types';
 
 const FACTORS: Array<[keyof Breakdown, string]> = [
   ['price', 'قیمت'],
@@ -66,8 +68,11 @@ export function ShopDetailsSheet({
         className={desktop ? 'w-[26rem] max-w-[90vw] overflow-y-auto sm:max-w-[26rem]' : 'mx-auto max-h-[85dvh] max-w-[520px] overflow-y-auto rounded-t-3xl'}
       >
         <SheetHeader>
-          <SheetTitle>{data?.shop_name ?? 'جزئیات فروشگاه'}</SheetTitle>
-          <SheetDescription>نشانی دقیق، ساعت کاری امروز و شرایط خرید</SheetDescription>
+          <SheetTitle className="flex items-center gap-2">
+            {data && <ShopTypeBadge type={data.shop_type} />}
+            {data?.shop_name ?? 'جزئیات فروشگاه'}
+          </SheetTitle>
+          <SheetDescription>{data ? `${shopTypeLabel(data.shop_type)} · نشانی، ساعت کاری امروز و شرایط خرید` : 'نشانی دقیق، ساعت کاری امروز و شرایط خرید'}</SheetDescription>
         </SheetHeader>
         <div className="space-y-4 px-4 pb-6 text-sm">
           {error && <p className="text-destructive">دریافت جزئیات ناموفق بود.</p>}

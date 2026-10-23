@@ -10,15 +10,18 @@ import {
   type GeoJSONSource,
   type MapLayerMouseEvent,
   type MapMouseEvent,
+  type ExpressionSpecification,
   type StyleSpecification,
 } from 'maplibre-gl';
 import { useEffect, useRef } from 'react';
 import { toFaDigits } from '@/lib/fa/digits';
+import { shopTypeLabel, type ShopType } from '@/lib/data/shop-types';
+import { clusterImage, loadMapIconKit, shopIconImage, type MapIconKit } from './map-icons';
 
 setWorkerUrl('/maplibre/maplibre-gl-worker.mjs');
 
-/** A shop drawn in the WebGL layer: `kind` sets the colour. */
-export type ShopPoint = { id: string; lat: number; lon: number; name: string; kind: 'offers' | 'maybe' | 'none' };
+/** A shop drawn in the WebGL layer: `type` picks the icon, `kind` the colour. */
+export type ShopPoint = { id: string; lat: number; lon: number; name: string; kind: 'offers' | 'maybe' | 'none'; type: ShopType; mall: string | null };
 
 export type MapMarker = { id: string; lat: number; lon: number; label: string; kind: 'seller' | 'maybe'; active?: boolean };
 
@@ -79,10 +82,23 @@ function shopsGeoJSON(points: ShopPoint[]) {
     type: 'FeatureCollection' as const,
     features: points.map((p) => ({
       type: 'Feature' as const,
-      properties: { id: p.id, name: p.name, kind: p.kind },
+      properties: { id: p.id, name: p.name, kind: p.kind, type: p.type },
       geometry: { type: 'Point' as const, coordinates: [p.lon, p.lat] },
     })),
   };
+}
+
+/** Image id for a cluster pill: colour from its shops, glyph (`unknown` = generic shop), category-only count. */
+function clusterIcon(type: ShopType | null | undefined): ExpressionSpecification {
+  return [
+    'concat',
+    'cl:',
+    ['case', ['>', ['get', 'offers'], 0], 'offers', 'none'],
+    ':',
+    ['to-string', ['get', 'point_count']],
+    `:${type ?? 'unknown'}:`,
+    ['to-string', ['get', 'maybe']],
+  ];
 }
 
 export default function MapView({
@@ -93,6 +109,8 @@ export default function MapView({
   shops,
   selectedShopId,
   onShopClick,
+  onClusterClick,
+  clusterType,
   pick,
   onPick,
   className,
@@ -105,6 +123,10 @@ export default function MapView({
   shops?: ShopPoint[];
   selectedShopId?: string | null;
   onShopClick?: (id: string) => void;
+  /** a group of shops that cannot be split by zooming (same mall/building) */
+  onClusterClick?: (ids: string[]) => void;
+  /** glyph on cluster pills: the filtered type, or a generic shop */
+  clusterType?: ShopType | null;
   pick?: { lat: number; lon: number } | null;
   onPick?: (lat: number, lon: number) => void;
   className?: string;
@@ -118,6 +140,11 @@ export default function MapView({
   onPickRef.current = onPick;
   const onShopRef = useRef(onShopClick);
   onShopRef.current = onShopClick;
+  const onClusterRef = useRef(onClusterClick);
+  onClusterRef.current = onClusterClick;
+  const kit = useRef<MapIconKit | null>(null);
+  const clusterTypeRef = useRef(clusterType);
+  clusterTypeRef.current = clusterType;
   // layers are added on 'style.load' (no waiting for tiles); later updates queue until then
   const ready = useRef(false);
   const queue = useRef<Array<() => void>>([]);
@@ -130,49 +157,107 @@ export default function MapView({
       style: OSM_STYLE,
       center: [center.lon, center.lat],
       zoom: 15,
+      maxZoom: 18,
       attributionControl: { compact: true },
     });
     m.addControl(new NavigationControl({ showCompass: false }), 'top-left');
-    m.once('style.load', () => {
+    m.once('style.load', async () => {
       m.addSource('radius', { type: 'geojson', data: circle(center.lat, center.lon, radiusM) });
       m.addLayer({ id: 'radius-fill', type: 'fill', source: 'radius', paint: { 'fill-color': '#0f766e', 'fill-opacity': 0.08 } });
       m.addLayer({ id: 'radius-line', type: 'line', source: 'radius', paint: { 'line-color': '#0f766e', 'line-width': 2, 'line-dasharray': [2, 2] } });
-      m.addSource('shops', { type: 'geojson', data: shopsGeoJSON([]) });
-      m.addLayer({
-        id: 'shops-dot',
-        type: 'circle',
-        source: 'shops',
-        paint: {
-          'circle-radius': ['interpolate', ['linear'], ['zoom'], 13, 2.5, 16, 5, 18, 8],
-          'circle-color': ['match', ['get', 'kind'], 'maybe', '#d97706', 'offers', '#0f766e', '#94a3b8'],
-          'circle-opacity': ['match', ['get', 'kind'], 'none', 0.55, 0.8],
-          'circle-stroke-color': '#ffffff',
-          'circle-stroke-width': 1,
+      kit.current = await loadMapIconKit().catch(() => null);
+      if (map.current !== m) return; // unmounted while loading
+      // shops in the same mall share coordinates, so they are clustered up to the max zoom
+      m.addSource('shops', {
+        type: 'geojson',
+        data: shopsGeoJSON([]),
+        maxzoom: 19,
+        cluster: true,
+        clusterRadius: 30,
+        clusterMaxZoom: 18,
+        clusterProperties: {
+          offers: ['+', ['case', ['==', ['get', 'kind'], 'offers'], 1, 0]],
+          maybe: ['+', ['case', ['==', ['get', 'kind'], 'maybe'], 1, 0]],
         },
       });
       m.addLayer({
         id: 'shops-selected',
         type: 'circle',
         source: 'shops',
-        filter: ['==', ['get', 'id'], ''],
-        paint: { 'circle-radius': 11, 'circle-color': '#b45309', 'circle-opacity': 0.35, 'circle-stroke-color': '#b45309', 'circle-stroke-width': 2 },
+        filter: ['all', ['!', ['has', 'point_count']], ['==', ['get', 'id'], '']],
+        paint: { 'circle-radius': 18, 'circle-color': '#b45309', 'circle-opacity': 0.3, 'circle-stroke-color': '#b45309', 'circle-stroke-width': 2 },
+      });
+      m.addLayer({
+        id: 'shops-icon',
+        type: 'symbol',
+        source: 'shops',
+        filter: ['!', ['has', 'point_count']],
+        layout: {
+          'icon-image': ['concat', 'shop:', ['get', 'type'], ':', ['get', 'kind']],
+          'icon-size': ['interpolate', ['linear'], ['zoom'], 12, 0.6, 15, 0.8, 17, 1],
+          'icon-allow-overlap': true,
+          'icon-ignore-placement': true,
+          'symbol-sort-key': ['match', ['get', 'kind'], 'maybe', 3, 'offers', 2, 1],
+        },
+      });
+      m.addLayer({
+        id: 'shops-cluster',
+        type: 'symbol',
+        source: 'shops',
+        filter: ['has', 'point_count'],
+        layout: {
+          'icon-image': clusterIcon(clusterTypeRef.current),
+          'icon-size': ['interpolate', ['linear'], ['zoom'], 12, 0.8, 16, 1],
+          'icon-allow-overlap': true,
+          'icon-ignore-placement': true,
+        },
       });
       ready.current = true;
       queue.current.splice(0).forEach((f) => f());
     });
-    const hover = new Popup({ closeButton: false, closeOnClick: false, offset: 8, className: 'hk-popup' });
-    m.on('mouseenter', 'shops-dot', (e: MapLayerMouseEvent) => {
+    // badge images are drawn on demand: shop:<type>:<kind> and cl:<kind>:<count>
+    m.setMissingStyleImageResolver((id) => {
+      const k = kit.current;
+      if (!k || m.hasImage(id)) return;
+      const [what, a, b] = id.split(':');
+      if (what === 'shop') m.addImage(id, shopIconImage(k, a, b), { pixelRatio: k.dpr });
+      else if (what === 'cl') {
+        const [, , , glyph = 'unknown', maybe = '0'] = id.split(':');
+        m.addImage(id, clusterImage(k, a, Number(b), glyph, Number(maybe)), { pixelRatio: k.dpr });
+      }
+    });
+    const hover = new Popup({ closeButton: false, closeOnClick: false, offset: 14, className: 'hk-popup' });
+    const showHover = (e: MapLayerMouseEvent, text: (p: Record<string, unknown>) => string) => {
       m.getCanvas().style.cursor = 'pointer';
       const f = e.features?.[0];
-      if (f) hover.setLngLat(e.lngLat).setText(String(f.properties?.name ?? '')).addTo(m);
-    });
-    m.on('mouseleave', 'shops-dot', () => {
+      if (f) hover.setLngLat((f.geometry as { coordinates: [number, number] }).coordinates).setText(text(f.properties ?? {})).addTo(m);
+    };
+    const hideHover = () => {
       m.getCanvas().style.cursor = '';
       hover.remove();
-    });
-    m.on('click', 'shops-dot', (e: MapLayerMouseEvent) => {
+    };
+    m.on('mousemove', 'shops-icon', (e: MapLayerMouseEvent) => showHover(e, (p) => `${p.name} · ${shopTypeLabel(String(p.type))}`));
+    m.on('mousemove', 'shops-cluster', (e: MapLayerMouseEvent) => showHover(e, (p) => `${toFaDigits(Number(p.point_count))} فروشگاه — برای دیدن بزنید`));
+    m.on('mouseleave', 'shops-icon', hideHover);
+    m.on('mouseleave', 'shops-cluster', hideHover);
+    m.on('click', 'shops-icon', (e: MapLayerMouseEvent) => {
       const id = e.features?.[0]?.properties?.id;
       if (id) onShopRef.current?.(String(id));
+    });
+    m.on('click', 'shops-cluster', async (e: MapLayerMouseEvent) => {
+      const f = e.features?.[0];
+      const src = m.getSource('shops') as GeoJSONSource | undefined;
+      if (!f || !src) return;
+      const clusterId = Number(f.properties?.cluster_id);
+      const at = (f.geometry as { coordinates: [number, number] }).coordinates;
+      hideHover();
+      const zoom = await src.getClusterExpansionZoom(clusterId);
+      if (zoom <= m.getMaxZoom()) {
+        m.easeTo({ center: at, zoom, duration: 500 });
+        return;
+      }
+      const leaves = await src.getClusterLeaves(clusterId, 500, 0);
+      onClusterRef.current?.(leaves.map((l) => String(l.properties?.id)));
     });
     m.on('click', (e: MapMouseEvent) => onPickRef.current?.(e.lngLat.lat, e.lngLat.lng));
     userPin.current = new MLMarker({ element: pinEl('user') }).setLngLat([center.lon, center.lat]).addTo(m);
@@ -222,7 +307,13 @@ export default function MapView({
   useEffect(() => {
     const m = map.current;
     if (!m) return;
-    whenReady(() => m.setFilter('shops-selected', ['==', ['get', 'id'], selectedShopId ?? '']));
+    whenReady(() => m.setLayoutProperty('shops-cluster', 'icon-image', clusterIcon(clusterType)));
+  }, [clusterType]);
+
+  useEffect(() => {
+    const m = map.current;
+    if (!m) return;
+    whenReady(() => m.setFilter('shops-selected', ['all', ['!', ['has', 'point_count']], ['==', ['get', 'id'], selectedShopId ?? '']]));
   }, [selectedShopId]);
 
   useEffect(() => {
