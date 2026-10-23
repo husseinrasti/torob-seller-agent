@@ -14,6 +14,7 @@ import type { SellerMessageOutput } from '../sim/seller-message';
 import type { BargainOutput } from '../search/market';
 import type { MallViewOutput } from '../search/mall-view';
 import type { BasketOutput, BasketPlanOutput } from '../plan/basket-service';
+import type { PhotoMatchOutput } from '../vision/photo-match';
 
 export type ClarifyOutput = { ui: 'clarify'; question: string; chips: string[] };
 
@@ -74,7 +75,9 @@ export type ToolOutput =
   | MallViewOutput
   | BasketOutput
   | BasketPlanOutput
+  | PhotoMatchOutput
   | ErrorOutput;
 
 /** Message metadata used by UI actions: run `tool` with `input` right away, then let the agent comment. */
-export type ActionMetadata = { action?: { tool: string; input: Record<string, unknown> }; auto?: boolean };
+/** `photo`: id of a thumbnail kept in the page's memory only (F1 — the photo itself is never stored) */
+export type ActionMetadata = { action?: { tool: string; input: Record<string, unknown> }; auto?: boolean; photo?: string };

@@ -129,6 +129,14 @@ function summarize(toolName: string, v: Json | null, error?: string): string {
       return `${String(v.answer)}.`;
     case 'best_time_to_visit':
       return `${String(v.sentence)}.`;
+    case 'photo_search': {
+      if (v.mission) return 'گزارش کامل برای کالای توی عکس آماده است.';
+      if (!v.recognized || !((v.candidates as Json[] | undefined) ?? []).length) return String(v.message ?? 'نتونستم تشخیص بدم، اسمش رو بنویس');
+      const top = (v.candidates as Json[])[0];
+      const shelf = v.shelf_price as Json | null;
+      const pos = shelf?.position === 'above_median' ? 'بالای میانه بازار' : shelf?.position === 'below_median' ? 'زیر میانه بازار' : 'نزدیک میانه بازار';
+      return `به نظرم «${String(top.title)}» است؛ اگر درست است «همین است» را بزنید.${shelf ? ` قیمت برچسب ${pos} است${Number(shelf.cheaper_nearby) ? ` و ${toFaDigits(Number(shelf.cheaper_nearby))} فروشنده نزدیک ارزان‌تر ثبت کرده‌اند` : ''}.` : ''}`;
+    }
     case 'basket_plan': {
       const items = (v.items as Json[] | undefined) ?? [];
       const swapped = items.filter((it) => it.replaced_out_of_stock).map((it) => `«${String(it.item)}»`);

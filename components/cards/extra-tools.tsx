@@ -14,6 +14,7 @@ import { SellerMessageCard } from './seller-message';
 import { BargainCard } from './bargain';
 import { MallViewCard } from './mall-view';
 import { BasketCard, BasketPlanCard } from './basket';
+import { PhotoMatchCard } from './photo-match';
 
 /** Tool outputs other than the core four: shop details, follow-ups, alternatives, checklist, plan. */
 export function ExtraToolView({ output, toolCallId, isLastMessage }: { output: ToolOutput; toolCallId: string; isLastMessage: boolean }) {
@@ -44,6 +45,8 @@ export function ExtraToolView({ output, toolCallId, isLastMessage }: { output: T
       return <BasketCard output={output} />;
     case 'basket_plan':
       return <BasketPlanCard output={output} />;
+    case 'photo_match':
+      return <PhotoMatchCard output={output} toolCallId={toolCallId} />;
     case 'shop':
       return (
         <div className="space-y-1.5 rounded-2xl border bg-card p-3 text-sm">

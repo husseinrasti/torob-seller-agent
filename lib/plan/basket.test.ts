@@ -70,6 +70,10 @@ describe('basket request parsing', () => {
     expect(looksLikeBasket('گوشی A17، کاور A17، گلس، پاوربانک ۲۰ هزار، همه یکجا نزدیک فردوسی')).toBe(true);
     expect(looksLikeBasket('گوشی سامسونگ تا ۶۰ میلیون نزدیک من')).toBe(false);
     expect(looksLikeBasket('گوشی A17 زیر ۶۰ میلیون، محدوده سعادت آباد')).toBe(false);
+    // a mission with comma-separated clauses is not a basket
+    expect(looksLikeBasket('گوشی سامسونگ حدود ۵۰ میلیون، محدوده سعادت آباد، خودت بپرس قیمت‌ها آپدیته، الان بازن')).toBe(false);
+    expect(looksLikeBasket('من یه گوشی سامسونگ حدود قیمت ۵۰ میلیون تومن میخوام. محدوده سعادت آباد باشه. و خودت بپرس ببین قیمت‌هاشون آپدیت هست یا نه و اینکه الان باز هستند.')).toBe(false);
+    expect(looksLikeBasket('گوشی A17، کاور، گلس، شارژر')).toBe(true);
   });
 });
 

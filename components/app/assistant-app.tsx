@@ -122,10 +122,10 @@ function Workspace({ chatId, initialMessages, me, chats, onNewChat, onOpenChat, 
       clearError();
       sendMessage({ text });
     };
-    const sendAction = (text: string, tool: string, input: Record<string, unknown>, opts?: { auto?: boolean }) => {
+    const sendAction = (text: string, tool: string, input: Record<string, unknown>, opts?: { auto?: boolean; photo?: string }) => {
       if (busy) return;
       clearError();
-      sendMessage({ text, metadata: { action: { tool, input }, auto: opts?.auto ?? false } });
+      sendMessage({ text, metadata: { action: { tool, input }, auto: opts?.auto ?? false, ...(opts?.photo ? { photo: opts.photo } : {}) } });
     };
     return {
       sendText,

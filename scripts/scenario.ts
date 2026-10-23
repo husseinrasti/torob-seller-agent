@@ -373,6 +373,24 @@ async function main() {
   check('9. recommendation or an explicit «پیشنهادی ندارم چون…»', /پیشنهاد:|پیشنهادی ندارم چون|هنوز پیشنهاد قطعی/.test(report));
   await snapAs(page, '23-mission-result', '[data-mission-result]');
 
+  // F1) photo search: a shelf price tag → «سامسونگ Galaxy A17», the tag price against the market and nearby
+  // sellers; an unrelated photo → «نتونستم تشخیص بدم، اسمش رو بنویس» (fixtures: tests/fixtures/vision)
+  await page.locator('[data-photo-input]').setInputFiles('tests/fixtures/vision/shelf-tag.jpg');
+  const photo = page.locator('[data-photo-match]').last();
+  await photo.waitFor({ timeout: 60_000 });
+  await waitIdle(page);
+  const photoText = await photo.innerText();
+  check('F1. shelf-tag photo → A17 top candidate, tag price vs market and nearby sellers, privacy line', (await photo.getAttribute('data-photo-match')) === 'recognized' && /A17/.test(photoText) && /۶۴٬?۵۰۰٬?۰۰۰|۶۴,۵۰۰,۰۰۰/.test(photoText) && /میانه بازار/.test(photoText) && /ذخیره نمی‌شود/.test(photoText) && (await page.locator('[data-photo-thumb]').count()) >= 1, photoText.split('\n').slice(0, 3).join(' / '));
+  await snapAs(page, '32-photo-match', '[data-photo-match]');
+  await page.locator('[data-photo-input]').setInputFiles('tests/fixtures/vision/unrelated.jpg');
+  await page.waitForFunction(() => document.querySelectorAll('[data-photo-match]').length >= 2, null, { timeout: 60_000 });
+  await waitIdle(page);
+  check('F1. unrelated photo → «نتونستم تشخیص بدم، اسمش رو بنویس»', /نتونستم تشخیص بدم، اسمش رو بنویس/.test(await page.locator('[data-photo-match]').last().innerText()));
+  await page.locator('[data-photo-match="recognized"]').last().locator('[data-photo-yes]').click();
+  await page.locator('[data-role="assistant"]').last().getByText(/فروشنده در شعاع/).waitFor({ timeout: 60_000 });
+  await waitIdle(page);
+  check('F1. «همین است» → sellers of the matched product', /A17/.test(await page.locator('section', { hasText: 'فروشنده در شعاع' }).last().innerText()));
+
   return finish();
 
   async function finish() {

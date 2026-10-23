@@ -24,6 +24,8 @@ import { mallView, type MallViewOutput } from '../search/mall-view';
 import { loadPlaces } from '../search/places';
 import { basketPlan, resolveBasketItem, resolveBasketItems, type BasketOutput, type BasketPlanOutput } from '../plan/basket-service';
 import { modelCodeOf } from '../plan/basket';
+import { photoMatch, VisionInput, type PhotoMatchOutput } from '../vision/photo-match';
+import { isMission } from './mission/extract';
 import { haversine } from '../geo';
 import { WEEK, visitSentence } from '../data/hours-stats';
 import { atLocalTime, FA_DAY } from '../data/hours';
@@ -461,6 +463,32 @@ export const TOOL_DEFS = {
       return Object.values(overrides).some(Boolean) ? { ...res, overrides } : res;
     },
     toModel: (o) => missionForModel(o),
+  }),
+
+  photo_search: def({
+    description:
+      'Photo search (UI only — the app calls it after the user sends a photo; never call it yourself): the identified brand/model/type → top 3 products, a shelf price against the market and nearby sellers; with a request in `text` that is a mission, the mission runs on the matched product.',
+    input: z.object({ vision: VisionInput, text: z.string().max(300).optional() }),
+    run: async (i, ctx): Promise<PhotoMatchOutput> => {
+      const out = await photoMatch({ vision: i.vision, state: ctx.state, now: ctx.now });
+      const top = out.candidates[0];
+      if (!i.text?.trim() || !top) return out;
+      const draft = await extractMission(i.text, ctx.state, { llm: false });
+      if (!isMission(draft.mission, { hasProductContext: true })) return out;
+      const progressId = `mission_${Date.now().toString(36)}`;
+      const emit = (p: MissionProgress) => ctx.write?.({ type: 'data-mission-progress', id: progressId, data: p });
+      ctx.state.chosenProduct = top.product_id;
+      const mission = { ...draft.mission, product: { query: out.query ?? top.title, product_id: top.product_id } };
+      return { ...out, mission: await runMission(mission, i.text, { ...ctx, emit }), suggested_actions: [] };
+    },
+    toModel: (o) => ({
+      recognized: o.recognized,
+      identified: o.label,
+      message: o.message,
+      candidates: o.candidates.map((c) => ({ product_id: c.product_id, title: c.title.split('|')[0].trim(), sellers: c.seller_count, median_price: c.median_price })),
+      shelf_price: o.shelf ? { price: o.shelf.price, market_median: o.shelf.stats?.median ?? null, position: o.shelf.position, delta_pct: o.shelf.delta_pct, cheaper_nearby: o.shelf.cheaper_nearby, cheapest_nearby: o.shelf.nearby[0] ?? null } : null,
+      ...(o.mission ? { mission: missionForModel(o.mission) } : {}),
+    }),
   }),
 
   best_time_to_visit: def({

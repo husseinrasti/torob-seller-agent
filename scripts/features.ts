@@ -1,4 +1,4 @@
-// Feature-pack golden checks (F11, F8, F5, F2, F3): library calls on the seeded DB, no LLM.
+// Feature-pack golden checks (F11, F8, F5, F2, F3, F1 without the vision call): library calls on the seeded DB, no LLM.
 // Usage: pnpm features   (part of pnpm golden)
 import './load-env';
 import { pool, q } from '../lib/db/client';
@@ -14,6 +14,8 @@ import { runTool } from '../lib/agent/tools';
 import { randomUUID } from 'node:crypto';
 import type { BasketPlanOutput } from '../lib/plan/basket-service';
 import { detectMission } from '../lib/agent/mission/extract';
+import type { PhotoMatchOutput } from '../lib/vision/photo-match';
+import { MISSION_EXAMPLE } from '../lib/agent/suggest';
 import { compareFloors } from '../lib/data/mall-floors';
 
 process.env.LLM_PROVIDER = 'offline';
@@ -112,7 +114,27 @@ async function f3() {
   check('F3 «پیگیری همه»: follow-ups awaited, out-of-stock items re-planned', verified.verified && statuses.every((s) => s !== 'pending' && s !== 'contacting'), `${statuses.join(', ')}${verified.items.some((it) => it.pick?.replaced) ? ' · replaced' : ''}`);
 }
 
+// what the vision models return for tests/fixtures/vision/shelf-tag.jpg (see `pnpm vision-check`)
+const SHELF_TAG = { brand: 'Samsung', model: 'Galaxy A17 4G', product_type: 'گوشی موبایل', visible_price_toman: 64_500_000, text_lines: ['فروشگاه موبایل', 'گوشی سامسونگ Galaxy A17 4G', 'قیمت:', '۶۴٬۵۰۰٬۰۰۰ تومان'], confidence: 0.95 };
+
+async function f1() {
+  const st = demoState();
+  st.chosenProduct = undefined;
+  const ctx = { sessionId: randomUUID(), state: st, now: appNow(DEMO_TIME) };
+  const out = (await runTool('photo_search', { vision: SHELF_TAG }, ctx)) as PhotoMatchOutput;
+  check('F1 shelf tag → A17 first of ≤ 3 candidates; tag price vs market median and nearby sellers', /A17/.test(out.candidates[0]?.title ?? '') && out.candidates.length <= 3 && out.shelf?.price === 64_500_000 && out.shelf.position === 'above_median' && out.shelf.nearby.length > 0, `${out.label} · ${out.shelf?.position} ${out.shelf?.delta_pct}% · ${out.shelf?.cheaper_nearby} cheaper nearby`);
+  const none = (await runTool('photo_search', { vision: { brand: null, model: null, product_type: 'منظره', visible_price_toman: null, text_lines: [], confidence: 0.1 } }, ctx)) as PhotoMatchOutput;
+  check('F1 a landscape → «نتونستم تشخیص بدم، اسمش رو بنویس»', !none.recognized && none.message === 'نتونستم تشخیص بدم، اسمش رو بنویس');
+  const st2 = demoState();
+  st2.chosenProduct = undefined;
+  const withText = (await runTool('photo_search', { vision: SHELF_TAG, text: 'همینو محدوده سعادت آباد زیر ۶۰ میلیون پیدا کن، موجودیشو بپرس' }, { sessionId: randomUUID(), state: st2, now: appNow(DEMO_TIME) })) as PhotoMatchOutput;
+  const m = withText.mission;
+  check('F1 photo + request → the mission runs on the matched product (followed up)', Boolean(m) && m!.rows.every((r) => /A17/i.test(r.product_title)) && m!.rows.some((r) => r.followup), m ? `${m.rows.length} rows · ${m.coverage.note ?? ''}`.slice(0, 120) : 'no mission');
+  check('F3/missions: the mission example is not a basket', !(await detectMission(MISSION_EXAMPLE, demoState())).mission.items);
+}
+
 async function main() {
+  await f1();
   await f11();
   await f8();
   await f5();

@@ -135,6 +135,7 @@ pnpm llm-check                             # one tool call per configured provid
 | `DB_PORT` · `POSTGRES_PASSWORD` | `5432` · `app` | Host port (bound to 127.0.0.1) and password of the compose database. |
 | `LLM_PROVIDER` | `openai` | `openai` · `google` · `openrouter` · `offline` — switch with zero code changes. |
 | `LLM_MODEL` · `LLM_FAST_MODEL` | `gpt-4.1-mini` · — | Tool‑calling model; optional cheaper model for routing, seller persona and checklist. |
+| `LLM_VISION_MODEL` | per provider | Photo search (F1): openai → `LLM_MODEL`, google → `gemini-3.1-flash-lite`, openrouter → `openai/gpt-4.1-mini`. The photo goes to that provider only and is not stored. `pnpm vision-check` runs the three fixtures. |
 | `OPENAI_API_KEY` · `OPENAI_BASE_URL` | — | OpenAI key; optional OpenAI‑compatible proxy URL. |
 | `GOOGLE_GENERATIVE_AI_API_KEY` | — | Gemini key. |
 | `OPENROUTER_API_KEY` | — | OpenRouter key. |

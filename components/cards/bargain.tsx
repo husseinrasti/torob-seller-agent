@@ -8,7 +8,7 @@ import { toFaDigits } from '@/lib/fa/digits';
 import type { BargainOutput } from '@/lib/search/market';
 import { SellerMessageSheet } from './seller-message';
 
-const POSITION: Record<BargainOutput['position'], { label: string; cls: string }> = {
+export const POSITION: Record<BargainOutput['position'], { label: string; cls: string }> = {
   below_median: { label: 'زیر میانه بازار', cls: 'bg-fresh-bg text-fresh' },
   near_median: { label: 'نزدیک میانه بازار', cls: 'bg-muted text-foreground' },
   above_median: { label: 'بالای میانه بازار', cls: 'bg-recent-bg text-recent' },

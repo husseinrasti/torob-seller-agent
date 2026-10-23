@@ -43,6 +43,26 @@ export function model(kind: ModelKind = 'chat') {
   }
 }
 
+/** Photo search (F1): `LLM_VISION_MODEL`, else a multimodal default per provider, else the chat model. */
+export const VISION_DEFAULTS: Record<string, string> = { openai: 'gpt-4.1-mini', google: 'gemini-3.1-flash-lite', openrouter: 'openai/gpt-4.1-mini' };
+
+export function visionModelId(): string {
+  const p = llmProvider();
+  return process.env.LLM_VISION_MODEL || (p === 'openai' ? process.env.LLM_MODEL : undefined) || VISION_DEFAULTS[p] || process.env.LLM_MODEL || 'gpt-4.1-mini';
+}
+
+export function visionModel() {
+  const id = visionModelId();
+  switch (llmProvider()) {
+    case 'google':
+      return createGoogleGenerativeAI({ apiKey: process.env.GOOGLE_GENERATIVE_AI_API_KEY })(id);
+    case 'openrouter':
+      return createOpenRouter({ apiKey: process.env.OPENROUTER_API_KEY })(id);
+    default:
+      return createOpenAI({ apiKey: process.env.OPENAI_API_KEY, baseURL: process.env.OPENAI_BASE_URL || undefined })(id);
+  }
+}
+
 const FALLBACK_AFTER_MS = 12_000;
 
 function withDeadline<T>(p: PromiseLike<T>, ms: number): Promise<T> {

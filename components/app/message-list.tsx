@@ -2,7 +2,8 @@
 
 import { memo } from 'react';
 import type { UIMessage } from 'ai';
-import { BellRing, Bot, Loader2 } from 'lucide-react';
+import { BellRing, Bot, Camera, Loader2 } from 'lucide-react';
+import { photoThumb } from '@/components/app/photo';
 import { Skeleton } from '@/components/ui/skeleton';
 import type { ActionMetadata, ToolOutput } from '@/lib/agent/types';
 import { faText } from '@/lib/fa/format';
@@ -156,6 +157,19 @@ const AssistantMessage = memo(function AssistantMessage({
   );
 });
 
+/** The photo of a photo search: in this page's memory only; after a reload a placeholder (it is not stored). */
+function PhotoThumb({ id }: { id: string }) {
+  const src = photoThumb(id);
+  return src ? (
+    <img data-photo-thumb src={src} alt="عکس ارسال‌شده" className="max-h-32 rounded-2xl border object-cover" />
+  ) : (
+    <span className="inline-flex items-center gap-1 rounded-full bg-muted px-2.5 py-1 text-[11px] text-muted-foreground">
+      <Camera className="size-3.5" />
+      عکس (ذخیره نشده)
+    </span>
+  );
+}
+
 function UserMessage({ message }: { message: UIMessage }) {
   const text = message.parts.map((p) => (p.type === 'text' ? p.text : '')).join(' ');
   const meta = message.metadata as ActionMetadata | undefined;
@@ -171,7 +185,8 @@ function UserMessage({ message }: { message: UIMessage }) {
     );
   }
   return (
-    <div className="flex justify-end" data-role="user">
+    <div className="flex flex-col items-end gap-1" data-role="user">
+      {meta?.photo && <PhotoThumb id={meta.photo} />}
       <p className={`max-w-[85%] rounded-2xl rounded-ee-md px-3.5 py-2 text-sm leading-6 ${isAction ? 'bg-secondary text-secondary-foreground' : 'bg-primary text-primary-foreground'}`}>{text}</p>
     </div>
   );

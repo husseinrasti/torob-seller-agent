@@ -95,11 +95,16 @@ export function splitBasketItems(text: string): string[] {
     .filter((s) => s.length >= 2 && !/^(?:و|با|همه|نزدیک|اطراف)$/u.test(s));
 }
 
-/** «… یکجا»، «+» or ≥ 3 comma-separated items: a basket request rather than a single search. */
+// words of a mission clause, not of a product line («حدود ۵۰ میلیون»، «محدوده سعادت آباد»، «خودت بپرس»)
+const CLAUSE_WORDS = /میلیون|تومن|تومان|محدوده|نزدیک|اطراف|حوالی|بپرس|پرس|چک|پیگیری|آپدیت|اپدیت|باز|برنامه|ساعت|شعاع|کیلومتر|متر|مطمئن|باشه|باشن|می ?خوام|میخوام/u;
+const productLike = (part: string) => part.split(/\s+/).length <= 4 && !CLAUSE_WORDS.test(part);
+
+/** «… یکجا»، «+» — or ≥ 3 short product lines («گوشی A17، کاور، گلس، شارژر») — is a basket, not one search. */
 export function looksLikeBasket(text: string): boolean {
   const parts = splitBasketItems(text);
   if (parts.length < 2) return false;
-  return /یک ?جا|یه ?جا|همه ?ش(?:و|ون)? ?با ?هم|\+/u.test(text) || parts.length >= 3;
+  if (/یک ?جا|یه ?جا|همه ?(?:ش|شو|شون|رو|را)? ?با ?هم|\+/u.test(text)) return true;
+  return parts.length >= 3 && parts.filter(productLike).length >= parts.length - 1 && parts.filter(productLike).length >= 3 && !/بپرس|چک کن|پیگیری کن|مطمئن شو/u.test(text);
 }
 
 const MODEL_CODE = /(?:^|[^a-z0-9])([a-z]{1,3}\d{1,3}[a-z]?)(?=[^a-z0-9]|$)/u;
