@@ -18,6 +18,22 @@
 
 ---
 
+## «ساعت ۱۱:۳۰ شب است و شارژر می‌خواهم» — decisions, not lists
+
+Price filtering is what Torob's own search already does. The hard part of shopping in person is **where and when**: at 23:30 every listed charger seller within 2 km is closed — is anything open farther away, is there a bazaar nearby that may have unlisted shops still open, or is «tomorrow 09:00, 1.7 km» the sane answer? The agent answers with a **map card**:
+
+<p align="center">
+  <img src="docs/screenshots/24-decision-night.png" width="230" alt="23:30: nothing listed is open within 2 km; the mobile bazaar 2.6 km away may have unlisted shops open; the earliest opening is tomorrow 09:00">
+  <img src="docs/screenshots/25-decision-evening.png" width="230" alt="18:40: open shops with prices, «عجله کن» for those closing at 19:00">
+  <img src="docs/screenshots/26-decision-time-scrubber.png" width="230" alt="The time scrubber moved to 19:30 re-runs the decision without the LLM">
+</p>
+
+- **Five tiers, each with its evidence and an honest confidence:** open and listed nearby · open but farther (travel time, «closes in N min», «عجله کن») · a nearby **bazaar** («بورس موبایل جمهوری» — derived from the dataset's shop density, or curated and labelled «بر اساس شناخت عمومی») that may have shops open though not in Torob · shops whose hours are unknown («بپرس بازه؟») · the earliest opening («یادآوری برای فردا ۰۹:۰۰»). A recommended tier by urgency, and the trade-off in one line («۴ کیلومتر دورتر ولی مطمئن» vs «۱ کیلومتر ولی نامطمئن»).
+- **The map is the answer:** you, the radius, prices on pins (one per building), the recommended place with a route and «≈ ۶ دقیقه با ماشین», closed shops as faint dots («بسته · فردا ۱۰:۰۰»), bazaars as shaded areas. A **time scrubber**, radius, urgency and walk/car toggles re-run the deterministic engine on the server — no LLM.
+- **Honest hours:** a declared `00:00–…` shift is a placeholder, never «open 24 h»; Friday closures are stated («جمعه ۱۰۰٪ فروشنده‌های هدفون در ۳ کیلومتر اطرافت تعطیل‌اند»). The agent adds two sentences at most.
+
+Try: «ساعت ۱۱:۳۰ شب، شارژر گوشی می‌خوام نزدیک میدان هفت تیر» · «جمعه ظهر هدفون می‌خوام» · «کابل تایپ‌سی، ۱۵ دقیقه دیگه قطار دارم» ([DECISIONS #101–105](docs/DECISIONS.md), [demo beats 2–3](docs/DEMO.md)).
+
 ## What it does — the four steps
 
 | Step | What the user gets |
@@ -28,7 +44,7 @@
 | **4. Follow up & go** | Simulated message/call follow‑ups with a live board (confirmed / out of stock / new price / no answer + transcripts). Out of stock → **alternatives automatically** (same product in the same mall first, then similar products ±20%). A visit plan ordered by mall and floor with ETA, open‑at‑arrival checks, navigation links (Neshan, Google Maps, OSM), a share link and an in‑store checklist. |
 
 ### Around the four steps
-- **One message, one mission.** A compound request — «من یه گوشی سامسونگ حدود قیمت ۵۰ میلیون تومن میخوام. محدوده سعادت آباد باشه. و خودت بپرس ببین قیمت‌هاشون آپدیت هست یا نه و اینکه الان باز هستند.» — is carried out end to end and reported once: the place is found (117‑place Tehran gazetteer + the dataset's neighbourhoods and malls), «حدود ۵۰ میلیون» becomes a 45–55 M band, the radius widens until there are sellers and the report says plainly when the area itself has none in Torob's data, sellers are asked (simulated) and their replies awaited, and every row gets a verdict (پیشنهادی / قابل قبول / توصیه نمی‌شود / نامشخص) with a reason — or «پیشنهادی ندارم چون…». Steps stream live; chips edit the constraints ([DECISIONS #58–74](docs/DECISIONS.md)).
+- **One message, one mission.** A compound request — «من یه گوشی سامسونگ حدود قیمت ۵۰ میلیون تومن میخوام. محدوده سعادت آباد باشه. و خودت بپرس ببین قیمت‌هاشون آپدیت هست یا نه و اینکه الان باز هستند.» — is carried out end to end and reported once: the place is found (118‑place Tehran gazetteer + the dataset's neighbourhoods and malls), «حدود ۵۰ میلیون» becomes a 45–55 M band, the radius widens until there are sellers and the report says plainly when the area itself has none in Torob's data, sellers are asked (simulated) and their replies awaited, and every row gets a verdict (پیشنهادی / قابل قبول / توصیه نمی‌شود / نامشخص) with a reason — or «پیشنهادی ندارم چون…». Steps stream live; chips edit the constraints ([DECISIONS #58–74](docs/DECISIONS.md)).
 - **Phone and desktop.** On a phone: one column, map and history in sheets. From 1024 px: chat history · conversation · live map side by side; cards reflow with container queries (two seller cards per row when there is room).
 - **Sign in with just a name** («اسمت چیه؟») — chats are saved per user. There is no password: whoever types the same name opens the same history (a deliberate hackathon trade‑off, [DECISIONS #43](docs/DECISIONS.md)).
 - **Chat history.** Previous chats are listed with their title and last activity (sidebar on desktop, sheet on mobile); opening one brings back every card — seller list, follow‑up board with its outcomes, visit plan — and continues the conversation. Each chat has its own URL (`/?c=<id>`), so back/forward and reload work.
@@ -47,6 +63,14 @@
 | **Trust signals** (F10) | «کامل بودن اطلاعات» 0–3 (hours known · website/Instagram · fresh price) with «چرا؟» — explicitly not a quality score; website/Instagram buttons; credit payment worded by channel (in person confirmed vs declared). |
 | **Best time to visit** (F11) | «کی برم؟» → share of open shops per hour (heatmap per weekday), the best window («یکشنبه بین ۱۱ تا ۱۸، ۹۳٪ بازند»), Friday closures, shops without hours; the visit plan offers «شروع از ۱۱:۰۰» when it would start outside the window. |
 
+### Minimal by design (TorobChat benchmark)
+Location · radius · «فیلترها» instead of six chips; a hero with one input and three examples; one primary action per card with «…» for the rest; fewer borders. Same behaviour, less chrome ([DECISIONS #106](docs/DECISIONS.md)):
+
+| Before (v1.1) | After |
+|---|---|
+| <img src="docs/screenshots/before/02-home.png" width="220" alt="v1.1 home"> | <img src="docs/screenshots/02-home.png" width="220" alt="Minimal home"> |
+| <img src="docs/screenshots/before/06-seller-cards.png" width="220" alt="v1.1 seller cards"> | <img src="docs/screenshots/06-seller-cards.png" width="220" alt="Seller cards with one primary action"> |
+
 ### Transparency rules (visible on every seller card)
 - **Three separate fields, three visual treatments:** «قیمت ثبت‌شده» (listed price) · «آخرین تغییر قیمت» (green ≤ 7 d, amber ≤ 30 d, red older, gray unknown) · «موجودی» (stays «تأیید نشده» until a follow‑up confirms it).
 - Unknown is shown as unknown («ثبت نشده»، «اعلام نشده»، «ساعت کاری ثبت نشده») — never blank, never guessed.
@@ -59,9 +83,9 @@
 |---|---|
 | **Product (75)** | All four steps end to end; mall → floor → unit navigation from free‑text addresses (4,088 shops parsed); price‑freshness and suspicious‑price flags; category‑only shops separated; follow‑ups with automatic alternatives; visit plan with open‑at‑arrival warnings; shareable plan; checklist; every shop of the area on the map by type, filterable and selectable; per‑user chat history with resume; **v1.1:** photo search with shelf‑price check, in‑mall floor view, multi‑item basket trip, ready‑to‑send seller message, bargaining card, grounded spec Q&A, trust signals, best time to visit. |
 | **UX (75)** | Mobile‑first RTL (390 px) **and** a desktop layout (≥ 1024 px: history · chat · live map); Vazirmatn, Persian digits everywhere; chat **plus** structured controls: sticky ContextBar (location, radius, price cap, conditions, intent) re‑filters the list **instantly without the LLM**; generative UI cards; skeletons; empty states with one tappable fix; 44 px targets; dark mode; camera button, floor tabs, BasketBar above the composer, per‑hour opening heatmap, evidence chips; Lighthouse mobile **92 / 100 / 100** (M5 build). |
-| **Intelligence (50)** | Vercel AI SDK v7 agent with 21 tools; vision model for photos (strict JSON, provider‑switchable); greedy set cover over malls for baskets; spec answers grounded in registered rows (numbers checked against the evidence); deterministic‑first category routing (product votes + trigram) with LLM refinement; Persian budget parser; explainable seller score and «چرا این اول شد؟» grounded in `score_breakdown`; proactive rules (stale price → follow up, out of stock → alternatives, confirmed → plan); memory across chats (usual location/radius, recent searches and products); compound requests run as one deterministic mission with the LLM at the edges (extraction, ≤ 3‑sentence summary); automatic fallback to a rule‑based model when the provider fails. |
+| **Intelligence (50)** | Vercel AI SDK v7 agent with 22 tools; a deterministic «where/when to buy» engine (five tiers, travel time, hub probabilities, urgency) with derived bazaars; vision model for photos (strict JSON, provider‑switchable); greedy set cover over malls for baskets; spec answers grounded in registered rows (numbers checked against the evidence); deterministic‑first category routing (product votes + trigram) with LLM refinement; Persian budget parser; explainable seller score and «چرا این اول شد؟» grounded in `score_breakdown`; proactive rules (stale price → follow up, out of stock → alternatives, confirmed → plan); memory across chats (usual location/radius, recent searches and products); compound requests run as one deterministic mission with the LLM at the edges (extraction, ≤ 3‑sentence summary); automatic fallback to a rule‑based model when the provider fails. |
 | **Deploy (40)** | `docker compose up -d` → PostgreSQL 16, app (Next standalone, non‑root, healthcheck), Caddy (automatic HTTPS); migrations + **auto‑seed** on first boot (~30 s); `/api/healthz`; exact VPS commands in [docs/DEPLOY.md](docs/DEPLOY.md). |
-| **Engineering (40)** | TypeScript end to end, Drizzle schema & migrations, COPY‑based seed with 4 streaming passes, pure tested modules (218 unit tests), golden search + mission + feature suites (95 checks), vision fixtures with a per‑provider check, Playwright scenario (46 checks on phone and desktop viewports), CI (typecheck · lint · test), decisions log ([docs/DECISIONS.md](docs/DECISIONS.md)). |
+| **Engineering (40)** | TypeScript end to end, Drizzle schema & migrations, COPY‑based seed with 4 streaming passes, pure tested modules (243 unit tests), golden search + mission + situational + feature suites (121 checks), vision fixtures with a per‑provider check, Playwright scenario (53 checks on phone and desktop viewports), CI (typecheck · lint · test), decisions log ([docs/DECISIONS.md](docs/DECISIONS.md)). |
 | **Dataset (20)** | Uses all three CSVs: Persian normalization (ی/ک, digits, ZWNJ), mall/floor/unit parser with spelling unification (علاالدین/علاءالدین/علائدین…), hours with `declared/closed/unsupported`, price age & suspicious‑price flags vs product median, payment providers with in‑person vs declared channel, warranty parsing, brand inference for the 75 % of products without a brand. |
 
 ## Architecture
@@ -133,7 +157,8 @@ Without any LLM key the app runs in **offline mode** (rule‑based model; badge 
 
 ```bash
 pnpm typecheck && pnpm lint && pnpm test   # CI runs these
-pnpm golden                                # 15 golden search queries + seller checks + 8 compound missions + feature-pack checks (needs the DB)
+pnpm golden                                # 15 golden search queries + seller checks + S1–S4 decisions + 8 compound missions + feature-pack checks (needs the DB)
+pnpm hubs                                  # rebuild the «بورس‌ها» table (the seed does it too)
 pnpm vision-check                          # photo search fixtures against every configured provider (network + keys)
 pnpm scenario                              # demo scenario §13 + history/memory on a 390 px viewport, screenshots → docs/screenshots/tmp
 pnpm scenario --desktop                    # same on 1440×900 (history sidebar + map column); --dark for dark mode
@@ -148,7 +173,7 @@ pnpm llm-check                             # one tool call per configured provid
 | `DB_PORT` · `POSTGRES_PASSWORD` | `5432` · `app` | Host port (bound to 127.0.0.1) and password of the compose database. |
 | `LLM_PROVIDER` | `openai` | `openai` · `google` · `openrouter` · `offline` — switch with zero code changes. |
 | `LLM_MODEL` · `LLM_FAST_MODEL` | `gpt-4.1-mini` · — | Tool‑calling model; optional cheaper model for routing, seller persona and checklist. |
-| `LLM_VISION_MODEL` | per provider | Photo search (F1): openai → `LLM_MODEL`, google → `gemini-3.1-flash-lite`, openrouter → `openai/gpt-4.1-mini`. The photo goes to that provider only and is not stored. `pnpm vision-check` runs the three fixtures. |
+| `LLM_VISION_MODEL` | per provider | Photo search (F1): openai → `LLM_MODEL`, google → `gemini-3.1-flash-lite`, openrouter → `google/gemini-2.5-flash`. The photo goes to that provider only and is not stored. `pnpm vision-check` runs the three fixtures. |
 | `OPENAI_API_KEY` · `OPENAI_BASE_URL` | — | OpenAI key; optional OpenAI‑compatible proxy URL. |
 | `GOOGLE_GENERATIVE_AI_API_KEY` | — | Gemini key. |
 | `OPENROUTER_API_KEY` | — | OpenRouter key. |

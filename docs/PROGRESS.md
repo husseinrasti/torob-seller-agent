@@ -192,3 +192,13 @@ Known issues / gaps:
 - Sign-in has no password: anyone who types the same name sees the same chats (by design for the demo, decision #43).
 - Product images (image.torob.com) did not load from the build machine (TLS errors / timeouts); a placeholder is shown until an image loads.
 - Live demo URL and the official dataset link are placeholders in README until the owner deploys / adds the link.
+
+## Post-v1.1 — Situational decisions (docs/07-prompt-situational-decisions.md)
+- **Hours placeholders ✅** — shifts starting at 00:00 are dropped (`lib/data/hours.ts`); unit tests (#101).
+- **Hubs ✅** — `lib/data/hubs.ts` (grid, per-family clusters, names, hours profile, curated merge), `data/hubs.curated.json`, table `hubs` (migration 0004), `lib/search/hubs.ts` (`rebuildHubs`, `loadHubs`, `findHubs`, `hubShops`), seed pass + `pnpm hubs`, `GET /api/hubs/shops`; unit tests on synthetic shops (#102).
+- **Decision engine ✅** — `lib/agent/decide.ts` (five tiers, travel time, confidence, recommendation by urgency, trade-offs, Friday note, `decisionSpeech`), `lib/agent/situation.ts` (moment, urgency, time budget, product words), `lib/search/decide-data.ts` (need → categories/families, listed shops ≤ 8 km, category-only nearby, hub family hours); unit tests (#103).
+- **Tool + integration ✅** — `decide_where_to_buy`, `POST /api/decide`, chat routing before missions, `find_sellers` «الان باز» hint, mission coverage note, prompt + offline summary (#104, #105).
+- **DecisionMap + cards ✅** — `components/map/decision-map-view.tsx` (user pin, radius, price pills per building, recommended highlight with route + ETA bubble, closed shops as faint dots with «بسته · فردا ۱۰:۰۰», hubs as shaded areas with label pills, amber ring for typical hours, dashed «؟» pins), `components/cards/decision.tsx` (verdict, trade-offs, time scrubber + chips, radius, urgency, transport; tier cards with one primary action each: مسیریابی / ببینم چه مغازه‌هایی آن‌جاست / بپرس بازه؟ / یادآوری برای …).
+- **Minimal-design pass ✅** — ContextBar, FiltersSheet, hero, seller-card «…», ≤ 4 chips (#106); before/after screenshots.
+- **Scenarios ✅** — `scripts/missions.ts` S1–S4 (69/69 with the missions); `pnpm scenario` step 10 (S1–S4) with `24-decision-night.png`, `25-decision-evening.png`, `26-decision-time-scrubber.png`, `27-decision-friday.png` (phone + desktop).
+- **Environment notes (2026-10-23)** — the OpenAI key behind the proxy reports «Spending limit reached»; Google returns «high demand»; OpenRouter works (`.env` switched to it by the owner). Photo search default for OpenRouter moved to `google/gemini-2.5-flash` (#107).
