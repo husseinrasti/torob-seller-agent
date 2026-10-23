@@ -30,6 +30,12 @@ The whole flow is automated by `pnpm scenario <app-url>` (33 checks incl. the mi
 | 8 | Tap **«گفتگوی تازه»** (＋) | «سلام داور!» + «از جایی که مانده بودیم»: the last search as a chip and «ادامه «گوشی سامسونگ تا ۶۰ میلیون…»» | Memory across chats (location, radius, searches, products) | `19-memory-new-chat.png` |
 | 8b | Open **«گفتگوهای قبلی»** (☰ on a phone, sidebar on desktop) and tap the previous chat (or «ادامه») | The whole chat comes back — seller list, follow‑up board with its outcomes, visit plan — and can be continued; the URL carries `?c=<chat id>` | History and resume | `20-history.png`, `21-resumed-chat.png` |
 
+## More beats (feature pack 2) — use as time allows
+
+| Feature | Tap / say | What appears | Point to make | Screenshot |
+|---|---|---|---|---|
+| F10 Trust signals | On a seller card tap **«کامل بودن اطلاعات … چرا؟»** | Three dots (hours known · website/Instagram · price changed ≤ 30 d) with the reasons, «وب‌سایت»/«اینستاگرام» buttons, «ساعت کاری ثبت‌شده»، credit payment «حضوری تأییدشده (…)» vs «اعلام‌شده (کانال نامشخص)»، «این فروشگاه N محصول دیگر در همین دسته دارد» | Completeness of the data, never a quality rating | `24-trust-signals.png` |
+
 ## Talking points (30 s wrap‑up)
 
 - **Product/UX:** four steps, chat + controls, mall → floor → unit, open‑at‑arrival, Persian everywhere; phone and desktop layouts; every shop on the map by type, filterable and selectable.

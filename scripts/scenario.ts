@@ -108,6 +108,21 @@ async function main() {
   await snap(page, 'sellers', 'section[aria-busy]');
   await snap(page, 'seller-cards', 'article[id^="shop-"]', 'first');
 
+  // F10) trust signals: «کامل بودن اطلاعات» on every card, the website button, both payment wordings
+  await page.getByRole('button', { name: /نمایش همه/ }).last().click().catch(() => {});
+  await page.waitForTimeout(300);
+  const trustRows = await page.locator('[data-trust-row]').count();
+  const webCard = page.locator('article[id^="shop-"]', { hasText: 'گوشی مارکت' }).first();
+  const webLink = await webCard.getByRole('link', { name: 'وب‌سایت' }).getAttribute('href').catch(() => null);
+  const declared = await page.locator('article[id^="shop-"]', { hasText: 'آروان دیسین' }).first().innerText().catch(() => '');
+  check(
+    'F10. trust signals on seller cards (completeness, website, payment channel)',
+    trustRows >= 10 && Boolean(webLink?.startsWith('http')) && /پرداخت اعتباری اعلام‌شده \(کانال نامشخص\)/.test(declared),
+    `${trustRows} cards · ${webLink}`,
+  );
+  await webCard.getByRole('button', { name: /کامل بودن اطلاعات/ }).click();
+  await snapAs(page, '24-trust-signals', 'article[id^="shop-"]:has-text("گوشی مارکت")');
+
   // 3a) map with every shop of the area + numbered sellers; tapping a seller opens its details
   if (!desktop) await page.getByRole('button', { name: 'نقشه' }).click();
   await page.locator('.maplibregl-canvas').waitFor({ timeout: 30_000 });

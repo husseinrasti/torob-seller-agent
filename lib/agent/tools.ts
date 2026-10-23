@@ -9,6 +9,7 @@ import { q } from '../db/client';
 import { formatDistance, formatTomanShort } from '../fa/format';
 import { toFaDigits } from '../fa/digits';
 import { FILTER_LABEL, type Filters } from '../search/score';
+import { paymentWording } from '../data/trust';
 import type { SessionState } from './state';
 import type { Suggestion } from './suggest';
 import { SIM_DISCLAIMER, startFollowups } from '../sim/followups';
@@ -256,6 +257,7 @@ export const TOOL_DEFS = {
         warranty: r.conditions.warranty_text,
         score: r.score,
         score_breakdown: r.score_breakdown,
+        info_completeness: r.trust ? `${r.trust.score}/3` : null,
         why: r.why,
       })),
     }),
@@ -277,7 +279,9 @@ export const TOOL_DEFS = {
       mall: o.mall ? [o.mall.name, o.mall.floor_label, o.mall.unit_label].filter(Boolean).join(' · ') : null,
       open: o.open.label,
       today_hours: o.today_hours,
-      payment: o.payment,
+      payment: paymentWording(o.payment_options),
+      info_completeness: { score: `${o.trust.score}/3`, reasons: o.trust.reasons.map((r) => r.label), website: Boolean(o.trust.website_url), instagram: Boolean(o.trust.instagram_url) },
+      same_category_products: o.same_category_count,
       other_offers: o.other_offers.map((x) => ({ title: x.title, price: x.price, price_age_days: x.price_age_days })),
     }),
   }),

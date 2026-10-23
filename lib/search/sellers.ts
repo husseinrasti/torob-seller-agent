@@ -5,6 +5,7 @@ import { floorText } from '../data/mall';
 import { toFaDigits } from '../fa/digits';
 import type { Freshness, PriceFlag } from '../data/quality';
 import type { ShopType } from '../data/shop-types';
+import { instagramUrl, paymentOptions, trustScore, type PaymentOption, type Trust } from '../data/trust';
 import {
   activeFilters,
   FILTER_LABEL,
@@ -45,6 +46,12 @@ export type SellerRow = {
   };
   offer_count: number;
   hours_known: boolean;
+  /** «کامل بودن اطلاعات» 0–3 with reasons and the shop's web/Instagram links */
+  trust: Trust;
+  /** declared credit-payment providers and whether the in-person channel is confirmed */
+  payment: PaymentOption[];
+  /** other products this shop lists in the chosen product's category (null when unknown) */
+  same_category_count: number | null;
   score: number;
   score_breakdown: Breakdown;
   why: string[];
@@ -134,6 +141,9 @@ type RawSeller = {
   torobpay_in_person: boolean;
   supports_fast_delivery: boolean | null;
   hours_known: boolean;
+  website_url: string | null;
+  instagram: string | null;
+  payment_options: Array<{ provider_name?: string; channel?: string }> | null;
 };
 
 /** All sellers of the products, one row per shop (cheapest sane offer), regardless of distance. */
@@ -150,7 +160,7 @@ async function rawSellers(productIds: string[], band?: { min?: number; max?: num
          FROM offers o WHERE o.product_id = ANY($1::text[]))
      SELECT c.*, s.name AS shop_name, s.address, s.lat, s.lon, s.mall_key, s.mall_name, s.floor_label, s.floor_num,
             s.unit_label, s.unit_kind, s.weekly_hours, s.has_installment, s.has_torobpay, s.installment_in_person,
-            s.torobpay_in_person, s.supports_fast_delivery, s.hours_known
+            s.torobpay_in_person, s.supports_fast_delivery, s.hours_known, s.website_url, s.instagram, s.payment_options
        FROM c JOIN shops s USING (shop_id) WHERE c.rn = 1`,
     [productIds],
   );
@@ -158,6 +168,7 @@ async function rawSellers(productIds: string[], band?: { min?: number; max?: num
 
 function toRow(r: RawSeller, lat: number, lon: number, now: Date) {
   const os = openState(r.weekly_hours, now);
+  const trust = trustScore({ hours_known: r.hours_known, website_url: r.website_url, instagram_url: instagramUrl(r.instagram), freshness: r.freshness });
   return {
     offer_id: r.offer_id,
     shop_id: r.shop_id,
@@ -184,7 +195,11 @@ function toRow(r: RawSeller, lat: number, lon: number, now: Date) {
     },
     offer_count: Number(r.shop_offer_count),
     hours_known: r.hours_known,
+    trust,
+    payment: paymentOptions(r.payment_options),
+    same_category_count: null as number | null,
     // flat fields used by filters / scoring
+    info_completeness: trust.score / 3,
     installment: r.has_installment,
     torobpay: r.has_torobpay,
     fast_delivery: r.supports_fast_delivery,
@@ -275,11 +290,21 @@ export async function findSellers(input: FindSellersInput): Promise<SellersResul
   const minDistance = scored.length ? Math.min(...scored.map((r) => r.distance_m)) : 0;
   const rows: SellerRow[] = scored
     .map((r) => {
-      const { installment: _i, torobpay: _t, fast_delivery: _f, has_warranty: _w, ...rest } = r;
-      void _i; void _t; void _f; void _w;
+      const { installment: _i, torobpay: _t, fast_delivery: _f, has_warranty: _w, info_completeness: _c, ...rest } = r;
+      void _i; void _t; void _f; void _w; void _c;
       return { ...rest, why: whyPhrases(r, { radiusM: radius, intent, minPrice, minDistance, medianPrice: p0?.median_price ?? null }) };
     })
     .sort((a, b) => b.score - a.score || a.distance_m - b.distance_m);
+  // «این فروشگاه N محصول دیگر در همین دسته دارد»
+  if (p0?.category_name && rows.length) {
+    const counts = await q<{ shop_id: string; n: number }>(
+      `SELECT o.shop_id, count(DISTINCT o.product_id)::int AS n FROM offers o JOIN products p USING (product_id)
+        WHERE p.category_name = $1 AND o.shop_id = ANY($2::text[]) GROUP BY 1`,
+      [p0.category_name, rows.map((r) => r.shop_id)],
+    );
+    const byShop = new Map(counts.map((c) => [c.shop_id, c.n]));
+    for (const r of rows) r.same_category_count = Math.max(0, (byShop.get(r.shop_id) ?? 1) - 1);
+  }
 
   // mall clusters among results
   const byMall = new Map<string, { names: Map<string, number>; count: number; best: number | null }>();
@@ -361,6 +386,10 @@ export type ShopDetails = {
   categories: string[];
   website_url: string | null;
   instagram: string | null;
+  instagram_url: string | null;
+  trust: Trust;
+  payment_options: PaymentOption[];
+  same_category_count: number | null;
   other_offers: Array<{ offer_id: string; product_id: string; title: string; price: number | null; freshness: Freshness; price_age_days: number | null }>;
   /** the chosen product's (cheapest sane) offer in this shop, when it lists it */
   product_offer: {
@@ -398,6 +427,7 @@ export async function shopDetails(shopId: string, opts: { category?: string | nu
     category_names: string[];
     website_url: string | null;
     instagram: string | null;
+    hours_known: boolean;
   }>(`SELECT * FROM shops WHERE shop_id = $1`, [shopId]);
   if (!s) return null;
   const [productOffer] = opts.excludeProductId
@@ -418,10 +448,21 @@ export async function shopDetails(shopId: string, opts: { category?: string | nu
     [shopId, opts.category ?? null, opts.excludeProductId ?? null],
   );
   const os = openState(s.weekly_hours, now);
+  const [sameCat] = opts.category
+    ? await q<{ n: number }>(
+        `SELECT count(DISTINCT o.product_id)::int AS n FROM offers o JOIN products p USING (product_id) WHERE o.shop_id = $1 AND p.category_name = $2 AND ($3::text IS NULL OR o.product_id <> $3)`,
+        [shopId, opts.category, opts.excludeProductId ?? null],
+      )
+    : [];
+  const insta = instagramUrl(s.instagram);
   return {
     shop_id: s.shop_id,
     shop_name: s.name,
     shop_type: await shopTypeOf(s.shop_id),
+    instagram_url: insta,
+    trust: trustScore({ hours_known: s.hours_known, website_url: s.website_url, instagram_url: insta, freshness: productOffer?.freshness ?? 'unknown' }),
+    payment_options: paymentOptions(s.payment_options),
+    same_category_count: sameCat ? sameCat.n : null,
     address: s.address,
     lat: s.lat,
     lon: s.lon,

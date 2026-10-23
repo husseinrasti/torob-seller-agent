@@ -166,6 +166,12 @@ Acceptance:
 - `pnpm scenario` (live OpenAI, demo time Sunday 16:00) with the new step 9 (hero mission chip): **33/33** on 390 px and **33/33** with `--desktop`; screenshots `22-mission-progress.png`, `23-mission-result.png` (phone and desktop).
 - The failing example now: سعادت‌آباد found → 4 Samsung phones in 45–55 M → 0 sellers within 1, 2 km, 1 within 3–8 km → the seller is asked and answers within the turn → report: coverage note («در خود سعادت‌آباد … ثبت نشده؛ نزدیک‌ترین‌ها در فاصله ۲٫۱ کیلومتر (آسمان)»), open/closed per row, verdict, and either a recommendation or «پیشنهادی ندارم چون…», plus «مرکز شهر را هم ببین».
 
+## Post-v1 — Feature pack 2 (docs/06-prompt-feature-pack.md)
+
+Built in the requested order, one commit per feature.
+
+- **F10 Trust signals ✅** — seller rows and the shop sheet carry «کامل بودن اطلاعات» (0–3 with reasons), website/Instagram buttons, «ساعت کاری ثبت‌شده/ثبت نشده», credit-payment channel wording, warranty, fast delivery and «N محصول دیگر در همین دسته»; ranking tie-breaker 0.05 (#76–78). Unit tests for the score, Instagram links and both payment wordings. Scenario: 24 cards with the row, «گوشی مارکت» → «وب‌سایت» link, «آروان دیسین» → «اعلام‌شده (کانال نامشخص)» (`24-trust-signals.png`).
+
 ## Final status
 
 - `pnpm typecheck && pnpm lint && pnpm test && pnpm golden` → green (169 unit tests; golden 15/15 queries + 10/10 seller checks + 45/45 mission checks).

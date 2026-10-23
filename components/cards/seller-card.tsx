@@ -11,6 +11,7 @@ import { useChatActions } from '@/components/app/chat-actions';
 import { useSession } from '@/components/app/session-context';
 import { AvailabilityBadge, ConditionChips, FreshnessBadge, MallChip, OpenDot, PriceLine, type Availability } from './badges';
 import { ShopDetailsSheet } from './shop-details-sheet';
+import { ShopFacts, TrustDots, TrustLinks } from './trust';
 
 export function SellerCard({ row, rank, availability, productTitle }: { row: SellerRow; rank: number; availability: Availability; productTitle?: string }) {
   const { sendAction, busy } = useChatActions();
@@ -70,6 +71,16 @@ export function SellerCard({ row, rank, availability, productTitle }: { row: Sel
       <div className="mt-2 flex flex-wrap gap-1">
         <ConditionChips c={row.conditions} />
       </div>
+
+      {row.trust && (
+        <div data-trust-row className="mt-2 space-y-1">
+          <div className="flex flex-wrap items-center justify-between gap-1.5">
+            <TrustDots trust={row.trust} />
+            <TrustLinks trust={row.trust} />
+          </div>
+          <ShopFacts hoursKnown={row.hours_known} payment={row.payment ?? []} sameCategory={row.same_category_count ?? null} />
+        </div>
+      )}
 
       {row.why.length > 0 && (
         <p className="mt-2 flex items-start gap-1 text-xs leading-5 text-primary">

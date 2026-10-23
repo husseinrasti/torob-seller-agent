@@ -37,13 +37,14 @@ export const FILTER_LABEL: Record<keyof Filters, string> = {
   hide_suspicious: 'پنهان کردن قیمت‌های مشکوک',
 };
 
-export type Weights = { price: number; distance: number; freshness: number; open: number; conditions: number };
+/** `info` = «کامل بودن اطلاعات» (hours, web/Instagram, recent price) — a 0.05 tie-breaker, never a quality score. */
+export type Weights = { price: number; distance: number; freshness: number; open: number; conditions: number; info: number };
 
 export const INTENT_WEIGHTS: Record<Intent, Weights> = {
-  balanced: { price: 0.35, distance: 0.25, freshness: 0.15, open: 0.15, conditions: 0.1 },
-  cheapest: { price: 0.6, distance: 0.15, freshness: 0.1, open: 0.1, conditions: 0.05 },
-  nearest: { price: 0.15, distance: 0.55, freshness: 0.1, open: 0.15, conditions: 0.05 },
-  now: { price: 0.2, distance: 0.25, freshness: 0.1, open: 0.4, conditions: 0.05 },
+  balanced: { price: 0.35, distance: 0.25, freshness: 0.15, open: 0.15, conditions: 0.1, info: 0.05 },
+  cheapest: { price: 0.6, distance: 0.15, freshness: 0.1, open: 0.1, conditions: 0.05, info: 0.05 },
+  nearest: { price: 0.15, distance: 0.55, freshness: 0.1, open: 0.15, conditions: 0.05, info: 0.05 },
+  now: { price: 0.2, distance: 0.25, freshness: 0.1, open: 0.4, conditions: 0.05, info: 0.05 },
 };
 
 /** Minimal seller facts needed for filtering/scoring (a subset of the API row). */
@@ -59,6 +60,8 @@ export type ScoreInput = {
   fast_delivery: boolean | null;
   has_warranty: boolean;
   hours_known: boolean;
+  /** 0..1, see lib/data/trust.ts */
+  info_completeness?: number;
 };
 
 export type Breakdown = Weights & { total: number };
@@ -100,7 +103,8 @@ export function scoreSellers<T extends ScoreInput>(rows: T[], radiusM: number, i
     const conditions = requested.length
       ? requested.filter((k) => facts[k]).length / requested.length
       : [r.installment, r.torobpay, r.fast_delivery === true, r.has_warranty, r.hours_known].filter(Boolean).length / 5;
-    const total = w.price * price + w.distance * distance + w.freshness * freshness + w.open * open + w.conditions * conditions;
+    const info = r.info_completeness ?? 0;
+    const total = w.price * price + w.distance * distance + w.freshness * freshness + w.open * open + w.conditions * conditions + w.info * info;
     const round = (x: number) => Math.round(x * 1000) / 1000;
     return {
       ...r,
@@ -111,6 +115,7 @@ export function scoreSellers<T extends ScoreInput>(rows: T[], radiusM: number, i
         freshness: round(freshness),
         open: round(open),
         conditions: round(conditions),
+        info: round(info),
         total: round(total),
       },
     };

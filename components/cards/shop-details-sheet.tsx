@@ -1,7 +1,7 @@
 'use client';
 
 import { useContext, useEffect, useState } from 'react';
-import { Clock, CreditCard, ExternalLink, ListPlus, Map, Phone, ShoppingBag, Truck } from 'lucide-react';
+import { Clock, CreditCard, ListPlus, Map, Phone, ShoppingBag, Truck } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { useIsDesktop } from '@/lib/client';
 import { ChatActionsContext } from '@/components/app/chat-actions';
@@ -15,6 +15,7 @@ import type { Breakdown } from '@/lib/search/score';
 import { useSession } from '@/components/app/session-context';
 import { AvailabilityBadge, FreshnessBadge, MallChip, OpenDot, PriceLine } from './badges';
 import { ShopTypeBadge } from '@/components/map/shop-type-icon';
+import { ShopFacts, TrustDots, TrustLinks } from './trust';
 import { shopTypeLabel } from '@/lib/data/shop-types';
 
 const FACTORS: Array<[keyof Breakdown, string]> = [
@@ -23,6 +24,7 @@ const FACTORS: Array<[keyof Breakdown, string]> = [
   ['freshness', 'تازگی قیمت'],
   ['open', 'باز بودن'],
   ['conditions', 'شرایط خرید'],
+  ['info', 'کامل بودن اطلاعات'],
 ];
 
 export function ShopDetailsSheet({
@@ -149,18 +151,17 @@ export function ShopDetailsSheet({
                   <p className="text-xs text-muted-foreground">{data.today_hours}</p>
                 </div>
               </section>
-              <section className="flex items-start gap-2">
-                <CreditCard className="mt-0.5 size-4 text-muted-foreground" />
-                {data.payment.length ? (
-                  <ul className="space-y-0.5">
-                    {data.payment.map((p) => (
-                      <li key={p.provider + p.channel_label}>
-                        {p.provider} <span className="text-xs text-muted-foreground">— {p.channel_label}</span>
-                      </li>
-                    ))}
-                  </ul>
-                ) : (
-                  <span className="text-muted-foreground">روش پرداخت اعتباری/قسطی اعلام نشده</span>
+              <section data-shop-trust className="space-y-1.5 rounded-xl border p-2.5">
+                <div className="flex flex-wrap items-center justify-between gap-2">
+                  <TrustDots trust={data.trust} />
+                  <TrustLinks trust={data.trust} />
+                </div>
+                <ShopFacts hoursKnown={data.hours_known} payment={data.payment_options} sameCategory={data.same_category_count} />
+                {!data.payment_options.length && (
+                  <p className="flex items-center gap-1 text-[11px] text-muted-foreground">
+                    <CreditCard className="size-3" />
+                    روش پرداخت اعتباری/قسطی اعلام نشده
+                  </p>
                 )}
               </section>
               <section className="flex items-center gap-2">
@@ -213,12 +214,6 @@ export function ShopDetailsSheet({
                   </a>
                 ))}
               </section>
-              {(data.website_url || data.instagram) && (
-                <a href={data.website_url ?? `https://instagram.com/${data.instagram}`} target="_blank" rel="noreferrer" className="inline-flex items-center gap-1 text-xs text-primary">
-                  <ExternalLink className="size-3.5" />
-                  {data.website_url ? 'وب‌سایت فروشگاه' : 'اینستاگرام فروشگاه'}
-                </a>
-              )}
               <p className="text-[11px] leading-5 text-muted-foreground">شماره‌های تماس این مجموعه‌داده آزمایشی‌اند؛ پیگیری از داخل همراه خرید و به‌صورت شبیه‌سازی‌شده انجام می‌شود.</p>
             </>
           )}
