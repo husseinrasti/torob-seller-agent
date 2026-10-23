@@ -31,6 +31,14 @@ async function snap(page: Page, name: string, locator?: string, which: 'first' |
   console.log(`      📸 ${file}`);
 }
 
+/** Extra screenshot that does not shift the numbering of the others (e.g. 07b-map-type-filter.png). */
+async function snapExtra(page: Page, name: string) {
+  const file = `${out}/${String(shot).padStart(2, '0')}b-${name}.png`;
+  await page.waitForTimeout(350);
+  await page.screenshot({ path: file });
+  console.log(`      📸 ${file}`);
+}
+
 async function waitIdle(page: Page) {
   // the composer shows the stop button while a reply streams
   await page.waitForFunction(() => !document.querySelector('button[aria-label="توقف"]'), null, { timeout: 60_000 });
@@ -96,12 +104,24 @@ async function main() {
   await page.locator('.maplibregl-canvas').waitFor({ timeout: 30_000 });
   await page.waitForTimeout(3000);
   const markers = await page.locator('.maplibregl-marker').count();
-  const legend = await page.getByText(/فروشگاه در محدوده/).first().innerText().catch(() => '');
-  check('3. map shows sellers and all shops of the area', markers >= 10 && /[۰-۹]/.test(legend), `${markers} pins · ${legend}`);
+  const typeBar = page.getByRole('toolbar', { name: 'نوع فروشگاه' });
+  const chips = (await typeBar.getByRole('button').allInnerTexts()).map((t) => t.replace(/\s+/g, ' ').trim());
+  check(
+    '3. map shows sellers and all shops of the area, by shop type',
+    markers >= 10 && chips.length >= 6 && /^همه [۰-۹]+$/.test(chips[0]),
+    `${markers} pins · ${chips.slice(0, 4).join(' / ')}`,
+  );
   await snap(page, 'map');
+  const mobileChip = typeBar.getByRole('button', { name: /موبایل و لوازم جانبی/ });
+  await mobileChip.click();
+  await page.waitForTimeout(1200);
+  check('3. a shop-type chip filters the map', (await mobileChip.getAttribute('aria-pressed')) === 'true');
+  await snapExtra(page, 'map-type-filter');
+  await mobileChip.click();
   await page.locator('button.maplibregl-marker', { hasText: /^۱$/ }).first().click();
   await page.getByText('کالای انتخابی شما را ثبت کرده است').waitFor({ timeout: 20_000 });
-  check('3. selecting a shop on the map opens its details', true);
+  const sheetHead = await page.getByRole('dialog').innerText();
+  check('3. selecting a shop on the map opens its details with its type', /موبایل و لوازم جانبی/.test(sheetHead));
   await snap(page, 'map-shop-details');
   await page.keyboard.press('Escape');
   await page.waitForTimeout(400);
