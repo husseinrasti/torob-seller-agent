@@ -8,6 +8,7 @@ import { formatDistance, formatTomanShort } from '../../fa/format';
 import { toFaDigits } from '../../fa/digits';
 import { DEFAULT_LOCATION, haversine } from '../../geo';
 import { productSearch } from '../product-search';
+import { visitTime, type VisitTimeOutput } from '../../search/visit-time';
 import type { SessionState } from '../state';
 import type { Suggestion } from '../suggest';
 import type { PlanOutput } from '../types';
@@ -339,6 +340,12 @@ export async function runMission(mission: Mission, text: string, ctx: MissionCtx
     } else set('plan', { status: 'skipped', detail: 'فروشنده پیشنهادی یا تأییدشده‌ای برای برنامه نبود' });
   }
 
+  // F11: «الان باز هستند؟» also gets the opening-hours picture of the reported sellers
+  let visit: VisitTimeOutput | undefined;
+  if (m.verify.hours && rows.length) {
+    visit = await visitTime({ scope: 'sellers', shop_ids: rows.map((r) => r.shop_id), title: 'فروشنده‌های این گزارش', state: st, now: ctx.now });
+  }
+
   // coverage: say plainly when the requested area has no / few listed sellers
   let note: string | undefined;
   const nearest = [...sellers].sort((a, b) => a.distance_m - b.distance_m)[0];
@@ -386,6 +393,7 @@ export async function runMission(mission: Mission, text: string, ctx: MissionCtx
     ...(conditionsNote ? { conditions_note: conditionsNote } : {}),
     next_actions: next.slice(0, 5),
     ...(plan ? { plan } : {}),
+    ...(visit ? { visit_time: visit } : {}),
     ...(followups.size ? { disclaimer: SIM_DISCLAIMER } : {}),
   });
 }

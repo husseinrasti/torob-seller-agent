@@ -1,7 +1,7 @@
 'use client';
 
 import { useEffect, useMemo, useRef, useState } from 'react';
-import { ChevronDown, Filter, Loader2, MapPinned, Store, X } from 'lucide-react';
+import { ChevronDown, Clock3, Filter, Loader2, MapPinned, Store, X } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/components/ui/collapsible';
 import { ToggleGroup, ToggleGroupItem } from '@/components/ui/toggle-group';
@@ -31,7 +31,7 @@ function sameParams(a: ReturnType<typeof paramsOf>, b: SellersResult['params']):
 
 export function SellerList({ output, isLatest, toolCallId }: { output: SellersOutput; isLatest: boolean; toolCallId: string }) {
   const { state, patch, setLatestSellers } = useSession();
-  const { updateToolOutput } = useChatActions();
+  const { updateToolOutput, sendAction, busy } = useChatActions();
   const [refreshed, setRefreshed] = useState(false);
   const followups = useFollowups();
   const [data, setData] = useState<SellersResult>(output);
@@ -99,7 +99,19 @@ export function SellerList({ output, isLatest, toolCallId }: { output: SellersOu
             {productTitle && <p className="line-clamp-1 text-xs text-muted-foreground">{productTitle}</p>}
             {refreshed && <p className="mt-0.5 text-[11px] text-primary">فهرست با تنظیمات جدید به‌روز شد</p>}
           </div>
-          {loading ? <Loader2 className="size-5 animate-spin text-primary" /> : <Store className="size-5 text-muted-foreground" />}
+          <div className="flex shrink-0 items-center gap-1.5">
+            {isLatest && data.count > 0 && (
+              <button
+                disabled={busy}
+                onClick={() => sendAction('کی بروم؟ این فروشنده‌ها چه ساعتی بازند؟', 'best_time_to_visit', { scope: 'sellers' })}
+                className="inline-flex h-8 items-center gap-1 rounded-full border bg-background px-2.5 text-[11px] font-medium hover:bg-muted disabled:opacity-60"
+              >
+                <Clock3 className="size-3.5" />
+                کی برم؟
+              </button>
+            )}
+            {loading ? <Loader2 className="size-5 animate-spin text-primary" /> : <Store className="size-5 text-muted-foreground" />}
+          </div>
         </div>
         {activeFilters.length > 0 && (
           <div className="flex flex-wrap gap-1">

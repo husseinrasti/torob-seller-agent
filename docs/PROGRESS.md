@@ -171,6 +171,7 @@ Acceptance:
 Built in the requested order, one commit per feature.
 
 - **F10 Trust signals ✅** — seller rows and the shop sheet carry «کامل بودن اطلاعات» (0–3 with reasons), website/Instagram buttons, «ساعت کاری ثبت‌شده/ثبت نشده», credit-payment channel wording, warranty, fast delivery and «N محصول دیگر در همین دسته»; ranking tie-breaker 0.05 (#76–78). Unit tests for the score, Instagram links and both payment wordings. Scenario: 24 cards with the row, «گوشی مارکت» → «وب‌سایت» link, «آروان دیسین» → «اعلام‌شده (کانال نامشخص)» (`24-trust-signals.png`).
+- **F11 Best time to visit ✅** — `lib/data/hours-stats.ts` (histogram, best window, Friday share, sentence, start hint), `best_time_to_visit` tool (sellers / mall / shop), `VisitTimeCard` (day tabs + 24-cell heatmap) behind «کی برم؟» on the seller list, plan header «بهترین زمان برای این مسیر» with a «شروع از …» chip, mission `verify.hours` attaches the card. A17 sellers: Sunday 11–19 at 91 %, Friday 38 % closed (#80). Unit tests on hand-made schedules; `pnpm features`; scenario (`25-visit-time.png`).
 
 ## Final status
 

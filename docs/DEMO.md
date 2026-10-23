@@ -35,6 +35,7 @@ The whole flow is automated by `pnpm scenario <app-url>` (33 checks incl. the mi
 | Feature | Tap / say | What appears | Point to make | Screenshot |
 |---|---|---|---|---|
 | F10 Trust signals | On a seller card tap **«کامل بودن اطلاعات … چرا؟»** | Three dots (hours known · website/Instagram · price changed ≤ 30 d) with the reasons, «وب‌سایت»/«اینستاگرام» buttons, «ساعت کاری ثبت‌شده»، credit payment «حضوری تأییدشده (…)» vs «اعلام‌شده (کانال نامشخص)»، «این فروشگاه N محصول دیگر در همین دسته دارد» | Completeness of the data, never a quality rating | `24-trust-signals.png` |
+| F11 Best time to visit | Seller list header → **«کی برم؟»** (also in the visit plan header) | 24-hour heatmap for a selectable day (شنبه … جمعه), the best window outlined, «یکشنبه بین ۱۱ تا ۱۹، ۹۱٪ فروشنده‌ها بازند؛ جمعه ۳۸٪ تعطیل‌اند؛ ساعت ۲ فروشگاه ثبت نشده»; the plan offers «شروع از ۱۱:۰۰» when it would start outside the window | Answers «کی برم؟» from registered hours only; unknown hours are counted, not guessed | `25-visit-time.png` |
 
 ## Talking points (30 s wrap‑up)
 

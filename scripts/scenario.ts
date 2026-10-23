@@ -123,6 +123,15 @@ async function main() {
   await webCard.getByRole('button', { name: /کامل بودن اطلاعات/ }).click();
   await snapAs(page, '24-trust-signals', 'article[id^="shop-"]:has-text("گوشی مارکت")');
 
+  // F11) «کی برم؟» from the seller list: per-hour heatmap, best window, Friday closures
+  await page.getByRole('button', { name: 'کی برم؟' }).last().click();
+  const visit = page.locator('[data-visit-time]').last();
+  await visit.waitFor({ timeout: 60_000 });
+  await waitIdle(page);
+  const visitText = await visit.innerText();
+  check('F11. best time to visit (window, Friday, unknown hours)', /یکشنبه بین [۰-۹]+ تا [۰-۹]+، [۰-۹]+٪/.test(visitText) && /جمعه [۰-۹]+٪ تعطیل/.test(visitText), visitText.split('\n').slice(-1)[0]);
+  await snapAs(page, '25-visit-time', '[data-visit-time]');
+
   // 3a) map with every shop of the area + numbered sellers; tapping a seller opens its details
   if (!desktop) await page.getByRole('button', { name: 'نقشه' }).click();
   await page.locator('.maplibregl-canvas').waitFor({ timeout: 30_000 });
@@ -220,6 +229,7 @@ async function main() {
   const oosShop = altText.match(/«(.+?)» ناموجود/)?.[1];
   check('6. plan skips the out-of-stock shop', Boolean(oosShop) && !planText.includes(oosShop!), oosShop);
   check('6. plan shows resolved follow-up statuses', !/در حال پیگیری/.test(planText));
+  check('F11. plan header: best time for this route', /بهترین زمان برای این مسیر/.test(planText));
   await snap(page, 'trip-plan', 'section[data-plan-id]');
   await page.locator('section[data-plan-id]').last().getByRole('button', { name: 'چک‌لیست خرید' }).click();
   await page.getByText('چک‌لیست خرید حضوری').last().waitFor({ timeout: 30_000 });

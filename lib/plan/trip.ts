@@ -1,5 +1,6 @@
 import { haversine, navLinks } from '../geo';
-import { openState, localClock, type WeeklyHours } from '../data/hours';
+import { openState, localClock, type DayKey, type WeeklyHours } from '../data/hours';
+import { WEEK, dayKeyOf, dayStats, startHint, visitSentence, type VisitWindow } from '../data/hours-stats';
 import { floorText } from '../data/mall';
 import { toFaDigits } from '../fa/digits';
 import type { FollowupStatus } from '../agent/state';
@@ -61,6 +62,8 @@ export type PlanPayload = {
   total_minutes: number;
   total_walk_m: number;
   warnings: number;
+  /** «بهترین زمان برای این مسیر» from the shops' weekly hours (F11) */
+  visit?: { day: DayKey; sentence: string; window: VisitWindow | null; start_hint: { day_offset: number; at: string } | null };
 };
 
 function hhmm(d: Date): string {
@@ -143,5 +146,14 @@ export function planTrip(stops: TripStop[], start: { lat: number; lon: number; l
     total_minutes: Math.round((t - now.getTime()) / 60_000),
     total_walk_m: Math.round(totalWalk),
     warnings,
+    visit: visitSummary(stops, now),
   };
+}
+
+function visitSummary(stops: TripStop[], now: Date): PlanPayload['visit'] {
+  if (!stops.length) return undefined;
+  const stats = WEEK.map((d) => dayStats(stops, d));
+  const today = dayKeyOf(now);
+  const day = stats.find((d) => d.day === today)!;
+  return { day: today, sentence: visitSentence(day, stats.find((d) => d.day === 'fri') ?? null, 'مغازه‌های این مسیر'), window: day.window, start_hint: startHint(stats, now) };
 }

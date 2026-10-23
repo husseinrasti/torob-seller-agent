@@ -4,6 +4,7 @@ import type { FollowupStatus } from '../state';
 import type { Suggestion } from '../suggest';
 import type { MallRef } from '../../search/sellers';
 import type { PlanOutput } from '../types';
+import type { VisitTimeOutput } from '../../search/visit-time';
 
 export type BudgetMode = 'about' | 'max' | 'min' | 'range';
 export type Intent = 'balanced' | 'cheapest' | 'nearest' | 'now';
@@ -74,6 +75,8 @@ export type MissionResult = {
   /** asked instead of running when the place was not found */
   clarify?: { question: string; chips: Array<{ label: string; text: string }> };
   plan?: PlanOutput;
+  /** «کی برم؟» for the reported sellers when the user asked about opening hours (F11) */
+  visit_time?: VisitTimeOutput;
   disclaimer?: string;
   channel: 'message' | 'call';
   intent: Intent;

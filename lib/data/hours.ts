@@ -2,7 +2,7 @@ import { toFaDigits } from '../fa/digits';
 
 export type DayKey = 'sat' | 'sun' | 'mon' | 'tue' | 'wed' | 'thu' | 'fri';
 type Shift = { start_time: string; end_time: string };
-type DayHours = { status?: string; shifts?: Shift[] };
+export type DayHours = { status?: string; shifts?: Shift[] };
 export type WeeklyHours = Partial<Record<DayKey, DayHours>> | null | undefined;
 
 export type OpenState = {
@@ -16,7 +16,7 @@ export type OpenState = {
 };
 
 // Index = JS weekday (0 = Sunday)
-const JS_DAY_KEYS: DayKey[] = ['sun', 'mon', 'tue', 'wed', 'thu', 'fri', 'sat'];
+export const JS_DAY_KEYS: DayKey[] = ['sun', 'mon', 'tue', 'wed', 'thu', 'fri', 'sat'];
 export const FA_DAY: Record<DayKey, string> = {
   sat: 'شنبه',
   sun: 'یکشنبه',
@@ -61,7 +61,7 @@ function minToHHMM(min: number): string {
  * Declared shifts of one day as [start, end) minute ranges; end < start means "until midnight".
  * Zero-length shifts («00:00–00:00») are placeholders in the data and are ignored.
  */
-function shiftsOf(day: DayHours | undefined): Array<[number, number]> | null {
+export function shiftsOf(day: DayHours | undefined): Array<[number, number]> | null {
   if (!day || day.status !== 'declared' || !day.shifts?.length) return null;
   const shifts = day.shifts
     .map((s): [number, number] => {
@@ -163,4 +163,11 @@ export function parseDemoTime(input: string | null | undefined): Date | null {
 /** The app clock: demo time when given, else real now. */
 export function appNow(demoTime?: string | null): Date {
   return parseDemoTime(demoTime) ?? new Date();
+}
+
+/** `now` moved to HH:MM local time, `addDays` days later (plan «شروع از ۱۱:۰۰»). */
+export function atLocalTime(now: Date, hhmm: string, addDays = 0, tz = TZ): Date {
+  const { minutes } = localClock(now, tz);
+  const [h, m] = hhmm.split(':').map(Number);
+  return new Date(now.getTime() + ((h * 60 + (m || 0) - minutes) + addDays * 1440) * 60_000);
 }

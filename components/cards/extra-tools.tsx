@@ -7,6 +7,7 @@ import { AlternativesPanel } from './alternatives-panel';
 import { Checklist } from './checklist';
 import { TripPlan } from './trip-plan';
 import { MissionResultCard } from './mission-result';
+import { VisitTimeCard } from './visit-time';
 
 /** Tool outputs other than the core four: shop details, follow-ups, alternatives, checklist, plan. */
 export function ExtraToolView({ output, toolCallId, isLastMessage }: { output: ToolOutput; toolCallId: string; isLastMessage: boolean }) {
@@ -21,6 +22,8 @@ export function ExtraToolView({ output, toolCallId, isLastMessage }: { output: T
       return <TripPlan plan={output} planId={output.plan_id} sharePath={output.share_path} />;
     case 'mission':
       return <MissionResultCard output={output} toolCallId={toolCallId} />;
+    case 'visit_time':
+      return <VisitTimeCard output={output} />;
     case 'shop':
       return (
         <div className="space-y-1.5 rounded-2xl border bg-card p-3 text-sm">

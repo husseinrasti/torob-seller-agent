@@ -16,6 +16,9 @@ import { SIM_DISCLAIMER, startFollowups } from '../sim/followups';
 import { findAlternatives } from '../search/alternatives';
 import { purchaseChecklist } from './checklist';
 import { buildPlan } from '../plan/service';
+import { visitTime, type VisitTimeOutput } from '../search/visit-time';
+import { WEEK, visitSentence } from '../data/hours-stats';
+import { atLocalTime, FA_DAY } from '../data/hours';
 import { extractMission } from './mission/extract';
 import { applyOverrides, missionForModel, runMission } from './mission/run';
 import type { MissionProgress, MissionResult } from './mission/types';
@@ -333,14 +336,26 @@ export const TOOL_DEFS = {
   plan_trip: def({
     description:
       'Visit plan: orders the chosen shops (default: shortlist + confirmed/pending follow-ups) by mall and distance, floors ascending inside a mall, with ETA, open-at-arrival checks and navigation links. Returns a shareable link.',
-    input: z.object({ offer_ids: z.array(z.string()).max(8).optional() }),
+    input: z.object({
+      offer_ids: z.array(z.string()).max(8).optional(),
+      start_at: z.string().regex(/^\d{2}:\d{2}$/).optional().describe('HH:MM local start time («شروع از ۱۱:۰۰»)'),
+      day_offset: z.number().int().min(0).max(7).optional(),
+    }),
     run: async (i, ctx): Promise<PlanOutput> => {
-      const res = await buildPlan({ sessionId: ctx.sessionId, state: ctx.state, now: ctx.now, offerIds: i.offer_ids });
+      const now = i.start_at ? atLocalTime(ctx.now, i.start_at, i.day_offset ?? 0) : ctx.now;
+      const res = await buildPlan({ sessionId: ctx.sessionId, state: ctx.state, now, offerIds: i.offer_ids });
       if (!res) throw new Error('هنوز فروشنده‌ای برای برنامه انتخاب نشده؛ اول پیگیری کنید یا «به برنامه» را بزنید.');
       ctx.state.planId = res.plan_id;
       const suggested: Suggestion[] = ctx.state.checklistOffered
         ? []
         : [{ kind: 'action', label: 'چک‌لیست خرید', text: 'چک‌لیست خرید حضوری را بده', tool: 'purchase_checklist', input: {} }];
+      // F11: the plan starts outside the hours most of its shops are open → offer a better start
+      const hint = res.payload.visit?.start_hint;
+      if (hint) {
+        const when = hint.day_offset === 0 ? '' : hint.day_offset === 1 ? 'فردا ' : `${FA_DAY[WEEK[(WEEK.indexOf(res.payload.visit!.day) + hint.day_offset) % 7]]} `;
+        const offerIds = res.payload.groups.flatMap((g) => g.steps.map((st) => st.offer_id));
+        suggested.unshift({ kind: 'action', label: `شروع ${when}از ${toFaDigits(hint.at)}`, text: `برنامه را برای ${when}ساعت ${toFaDigits(hint.at)} بچین`, tool: 'plan_trip', input: { offer_ids: offerIds, start_at: hint.at, day_offset: hint.day_offset } });
+      }
       return { ui: 'plan', plan_id: res.plan_id, share_path: `/plan/${res.plan_id}`, ...res.payload, suggested_actions: suggested };
     },
     toModel: (o) => ({
@@ -371,6 +386,23 @@ export const TOOL_DEFS = {
       return Object.values(overrides).some(Boolean) ? { ...res, overrides } : res;
     },
     toModel: (o) => missionForModel(o),
+  }),
+
+  best_time_to_visit: def({
+    description:
+      '«کی برم؟»: from the weekly opening hours of the current seller list (scope sellers), a mall (mall_key) or one shop (shop_id) — share of open shops per hour for each day, the best window, Friday closures and shops without hours. Use for «کی برم؟», «چه ساعتی بازن؟», «جمعه بازه؟».',
+    input: z.object({
+      scope: z.enum(['sellers', 'mall', 'shop']).default('sellers'),
+      mall_key: z.string().optional(),
+      shop_id: z.string().optional(),
+      day: z.enum(['sat', 'sun', 'mon', 'tue', 'wed', 'thu', 'fri']).optional(),
+    }),
+    run: async (i, ctx): Promise<VisitTimeOutput> => visitTime({ ...i, state: ctx.state, now: ctx.now }),
+    toModel: (o) => {
+      const day = o.days.find((d) => d.day === o.day)!;
+      const fri = o.days.find((d) => d.day === 'fri') ?? null;
+      return { title: o.title, shops: o.shops, day: FA_DAY[o.day], window: day.window ? { from: day.window.start, to: day.window.end, open_share: day.window.coverage } : null, friday_closed_share: fri?.closedShare ?? null, hours_unknown: day.unknown, sentence: visitSentence(day, fri, o.noun) };
+    },
   }),
 
   purchase_checklist: def({

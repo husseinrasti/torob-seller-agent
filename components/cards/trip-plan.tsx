@@ -2,7 +2,7 @@
 
 import { useContext } from 'react';
 import Link from 'next/link';
-import { Building2, ClipboardCheck, Clock, Footprints, Map, Navigation, Share2, TriangleAlert } from 'lucide-react';
+import { Building2, ClipboardCheck, Clock, Clock3, Footprints, Map, Navigation, Share2, TriangleAlert } from 'lucide-react';
 import { toast } from 'sonner';
 import { Button } from '@/components/ui/button';
 import { cn } from '@/lib/utils';
@@ -93,6 +93,14 @@ export function TripPlan({ plan, planId, sharePath }: { plan: PlanPayload; planI
           <Footprints className="size-3.5" />
           شروع از {plan.start.label} · ساعت {plan.start_label} · {formatDistance(plan.total_walk_m)} پیاده‌روی
         </p>
+        {plan.visit && (
+          <p data-plan-visit className="flex items-start gap-1 text-xs leading-5 text-muted-foreground">
+            <Clock3 className="mt-0.5 size-3.5 shrink-0" />
+            <span>
+              <span className="font-medium text-foreground">بهترین زمان برای این مسیر:</span> {plan.visit.sentence}
+            </span>
+          </p>
+        )}
         {plan.warnings > 0 && (
           <p className="flex items-center gap-1 text-xs font-medium text-stale">
             <TriangleAlert className="size-3.5" />

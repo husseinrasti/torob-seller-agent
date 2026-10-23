@@ -13,6 +13,7 @@ import { useSession } from '@/components/app/session-context';
 import { AvailabilityBadge, FreshnessBadge, OpenDot } from './badges';
 import { ShopDetailsSheet } from './shop-details-sheet';
 import { TripPlan } from './trip-plan';
+import { VisitTimeCard } from './visit-time';
 
 const pendingish = (s?: string) => s === 'pending' || s === 'contacting';
 
@@ -261,6 +262,12 @@ export function MissionResultCard({ output, toolCallId }: { output: MissionResul
             ))}
           </ul>
         </>
+      )}
+
+      {output.visit_time && (
+        <div className="border-t p-3">
+          <VisitTimeCard output={output.visit_time} />
+        </div>
       )}
 
       {output.plan && (
