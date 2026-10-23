@@ -31,8 +31,9 @@ sudo systemctl restart docker
 ```bash
 git clone https://github.com/husseinrasti/torob-seller-agent.git
 cd torob-seller-agent
-git checkout v1.0
 ```
+
+`main` is the latest version (name sign‑in, chat history, memory, desktop layout); `git checkout v1.0` gives the first release without them.
 
 ## 3. Dataset (from your laptop)
 
@@ -60,7 +61,7 @@ APP_DOMAIN=hamrah.example.com
 APP_URL=https://hamrah.example.com
 POSTGRES_PASSWORD=<a-long-random-password>
 LLM_PROVIDER=openai                 # or google / openrouter
-LLM_MODEL=gpt-4.1-mini              # e.g. gemini-2.5-flash for google, openai/gpt-4.1-mini for openrouter
+LLM_MODEL=gpt-4.1-mini              # e.g. gemini-3.1-flash-lite for google, openai/gpt-4.1-mini for openrouter
 OPENAI_API_KEY=sk-...               # the key matching LLM_PROVIDER
 ```
 
@@ -89,7 +90,7 @@ docker compose ps
 
 Expected: `{"ok":true,"db":true,"counts":{"shops":6476,"products":225903,"offers":331506},"llm_provider":"openai"}` and all three services `Up` (`app` becomes `healthy`).
 
-On a phone open `https://hamrah.example.com/demo-reset?demo_time=2026-10-25T16:00` and follow [DEMO.md](DEMO.md). From your laptop you can also run the scripted check against the server:
+On a phone open `https://hamrah.example.com/demo-reset?demo_time=2026-10-25T16:00&name=داور` (signs in as «داور» with an empty history) and follow [DEMO.md](DEMO.md). A desktop browser gets the three‑column layout. From your laptop you can also run the scripted check against the server:
 
 ```bash
 pnpm install && pnpm scenario https://hamrah.example.com

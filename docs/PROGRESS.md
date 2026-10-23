@@ -113,14 +113,32 @@ Acceptance (local, fresh compose project and volumes, Caddy on :8089):
 - `docker compose restart app` / recreate → data kept, seed skipped (`--if-empty`), healthz green.
 - `docker compose run --rm app node scripts/seed.cjs --if-empty` runs the bundled seed.
 
+## Post-v1 — Name sign-in, chat history, memory, desktop layout, shops map ✅
+
+Request (owner, 2026-10-23): a desktop layout as well as mobile, adapting to the device; memory; a list of previous chats that can be continued; a simple name-only login so chats are saved per user; shops shown on the map and selectable.
+
+Done:
+- `users` table and `sessions.user_id/title/messages` (migration `0003_users_chats`); `lib/auth.ts` (name-only sign-in cookie), `lib/agent/memory.ts`; APIs `auth/login`, `auth/logout`, `me`, `me/memory`, `chats`, `chats/[id]`, `chats/[id]/messages`, `shops/near`; the existing APIs take the chat id.
+- Login screen; history panel (desktop sidebar, mobile sheet, delete); resume via `/?c=<id>` with back/forward; hero greeting and «از جایی که مانده بودیم»; memory block in the system prompt; «پاک کردن».
+- Desktop layout from 1024 px (history · chat · map column) with container-query card grids; the shop sheet opens from the side on desktop.
+- Map: every shop within the radius (WebGL layer, legend, «فقط مرتبط‌ها / همه فروشگاه‌ها»), names on hover, click → shop sheet with the chosen product's offer and «پیگیری» / «به برنامه».
+- Fixes found while testing with live models: «نزدیک من» no longer moves the location, the follow-up status race in the visit plan, ASCII digits in LLM text (decisions #49–#51).
+- Unit tests for memory and name validation.
+
+Acceptance:
+- `pnpm typecheck && pnpm lint && pnpm test && pnpm golden` green (107 unit tests; golden 15/15 + 10/10).
+- `pnpm scenario` with the live model (OpenAI `gpt-5.4-mini`, demo time Sunday 16:00): **27/27** on 390 px, **27/27** with `--desktop` (1440×900), and **27/27** against the rebuilt Docker image through Caddy (`http://localhost:8088`, 52 s). Screenshots: `docs/screenshots/` and `docs/screenshots/desktop/`.
+- `pnpm llm-check`: openai (`gpt-5.4-mini`) OK in 2.6 s, google (`gemini-3.1-flash-lite`) OK in 1.1 s, openrouter (`openai/gpt-4.1-mini`) OK in 2.1 s.
+
 ## Final status
 
-- `pnpm typecheck && pnpm lint && pnpm test && pnpm golden` → green (99 unit tests; golden 15/15 queries + 10/10 seller checks).
-- Demo scenario §13 steps 1–7: `pnpm scenario` 20/20 (dev, production build and Docker), `?demo_time=` and `/demo-reset` supported.
+- `pnpm typecheck && pnpm lint && pnpm test && pnpm golden` → green (107 unit tests; golden 15/15 queries + 10/10 seller checks).
+- Demo scenario §13 steps 1–7 plus history/memory (step 8): `pnpm scenario` 27/27 (phone, desktop and Docker), `?demo_time=` and `/demo-reset?name=` supported.
+- All three LLM providers verified live on 2026-10-23 (`pnpm llm-check`: 3 ok).
 - CI: GitHub Actions (install → typecheck → lint → test) on every push.
 - Parsed malls for 4,088 shops (after parser refinements in M1).
 
 Known issues / gaps:
-- **LLM providers not verified live — no API keys were available** (`pnpm llm-check`: openai, google and openrouter all skipped). The agent was verified with the offline rule model and with a failing provider (automatic fallback + Persian notice). Add a key to `.env` and run `pnpm llm-check` (and `LLM_PROVIDER=<p> pnpm llm-check --provider=<p>`).
-- Product images (image.torob.com) did not load from the build machine (TLS error); a placeholder is shown until an image loads.
+- Sign-in has no password: anyone who types the same name sees the same chats (by design for the demo, decision #43).
+- Product images (image.torob.com) did not load from the build machine (TLS errors / timeouts); a placeholder is shown until an image loads.
 - Live demo URL and the official dataset link are placeholders in README until the owner deploys / adds the link.
