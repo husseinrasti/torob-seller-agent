@@ -31,7 +31,7 @@ export type SellerRow = {
   distance_m: number;
   lat: number;
   lon: number;
-  open: { known: boolean; open: boolean | null; label: string; closesAt?: string };
+  open: { known: boolean; open: boolean | null; label: string; closesAt?: string; opensAt?: string };
   mall: MallRef | null;
   address_short: string;
   conditions: {
@@ -137,12 +137,14 @@ type RawSeller = {
 };
 
 /** All sellers of the products, one row per shop (cheapest sane offer), regardless of distance. */
-async function rawSellers(productIds: string[]): Promise<RawSeller[]> {
+async function rawSellers(productIds: string[], band?: { min?: number; max?: number }): Promise<RawSeller[]> {
+  // one offer per shop: inside the mission's price band first (when given), then sane, cheapest, freshest
+  const inBand = band ? `(o.price_toman BETWEEN ${Math.floor(band.min ?? 0)} AND ${Math.ceil(band.max ?? 1e15)}) DESC NULLS LAST, ` : '';
   return q<RawSeller>(
     `WITH c AS (
        SELECT o.offer_id, o.product_id, o.shop_id, o.price_toman::float8 AS price, o.price_flag, o.freshness,
               o.price_age_days, o.warranty_text, o.has_warranty,
-              row_number() OVER (PARTITION BY o.shop_id ORDER BY (o.price_flag = 'ok') DESC, o.price_toman ASC NULLS LAST,
+              row_number() OVER (PARTITION BY o.shop_id ORDER BY ${inBand}(o.price_flag = 'ok') DESC, o.price_toman ASC NULLS LAST,
                                  o.price_age_days ASC NULLS LAST) AS rn,
               count(*) OVER (PARTITION BY o.shop_id) AS shop_offer_count
          FROM offers o WHERE o.product_id = ANY($1::text[]))
@@ -168,7 +170,7 @@ function toRow(r: RawSeller, lat: number, lon: number, now: Date) {
     distance_m: Math.round(haversine(lat, lon, r.lat, r.lon)),
     lat: r.lat,
     lon: r.lon,
-    open: { known: os.known, open: os.open, label: os.label, closesAt: os.closesAt },
+    open: { known: os.known, open: os.open, label: os.label, closesAt: os.closesAt, opensAt: os.opensAt },
     mall: mallRef(r),
     address_short: shortAddress(r.address),
     conditions: {
@@ -241,6 +243,8 @@ export type FindSellersInput = {
   filters?: Filters;
   intent?: Intent;
   now?: Date;
+  /** prefer each shop's offer inside this price band (missions: «حدود ۵۰ میلیون») */
+  price_band?: { min?: number; max?: number } | null;
 };
 
 /** Spec §5.4: sellers within radius, filters, explainable score, clusters, category-only shops, relaxations. */
@@ -257,7 +261,7 @@ export async function findSellers(input: FindSellersInput): Promise<SellersResul
               median_price::float8 AS median_price, seller_count FROM products WHERE product_id = ANY($1::text[])`,
       [product_ids],
     ),
-    rawSellers(product_ids),
+    rawSellers(product_ids, input.price_band ?? undefined),
   ]);
   const p0 = productRows.find((p) => p.product_id === product_ids[0]) ?? productRows[0];
   const all = raw.map((r) => toRow(r, lat, lon, now));

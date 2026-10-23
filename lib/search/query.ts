@@ -25,37 +25,54 @@ function toToman(n: number, unit: string | undefined): number {
   return n * (UNIT_MULT[u] ?? 1);
 }
 
-const RANGE_RE = new RegExp(`بین\\s*${NUM}\\s*${UNIT}?\\s*(?:و|تا)\\s*${NUM}\\s*${UNIT}?${TOMAN}`, 'u');
+const RANGE_RE = new RegExp(`(?:بین|از)\\s*${NUM}\\s*${UNIT}?\\s*(?:و|تا)\\s*${NUM}\\s*${UNIT}?${TOMAN}`, 'u');
 const MAX_RE = new RegExp(
   `(?:تا|زیر|کمتر از|حداکثر|نهایتا|نهایت|ماکزیمم|سقف)\\s*${NUM}\\s*(میلیارد|میلیون|ملیون|هزار|تومن|تومان)?(?:ی)?${TOMAN}`,
   'u',
 );
-const ABOUT_RE = new RegExp(`(?:حدود|حدودا|در حد|بودجه(?:\\s*ام|م)?|با بودجه|با)\\s*${NUM}\\s*${UNIT}(?:ی)?${TOMAN}`, 'u');
+const ABOUT_RE = new RegExp(
+  `(?:حدود|حدودا|در حد|تقریبا|حول و حوش|دور و بر|حوالی|بودجه(?:\\s*ام|م)?|با بودجه|با)\\s*(?:قیمت(?:ش|ی)?\\s*)?${NUM}\\s*${UNIT}(?:ی)?${TOMAN}`,
+  'u',
+);
+const MIN_RE = new RegExp(
+  `(?:(?:بالای|بیشتر از|حداقل|مینیمم)\\s*${NUM}\\s*(میلیارد|میلیون|ملیون|هزار)(?:ی)?${TOMAN}|از\\s*${NUM}\\s*(میلیارد|میلیون|ملیون|هزار)${TOMAN}\\s*(?:به بالا|بالاتر|به بعد))`,
+  'u',
+);
 const PLAIN_RE = new RegExp(`${NUM}\\s*(میلیارد|میلیون|ملیون)(?:ی)?${TOMAN}|${NUM}\\s*هزار\\s*(?:تومن|تومان)|${NUM}\\s*(?:تومن|تومان)`, 'u');
 
-/** Extract a budget in toman; returns the budget and the text without the matched span. */
-export function parseBudget(norm: string): { budget?: Budget; rest: string } {
+export type BudgetMode = 'range' | 'max' | 'min' | 'about' | 'plain';
+
+/**
+ * Extract a budget in toman; returns the budget, the text without the matched span, how it was said
+ * (`mode`) and, for «حدود ۵۰ میلیون» / «۵۰ میلیون», the stated `amount`.
+ */
+export function parseBudget(norm: string): { budget?: Budget; rest: string; mode?: BudgetMode; amount?: number } {
   let m = norm.match(RANGE_RE);
   if (m) {
     const unit2 = m[4] ?? m[2];
     const a = toToman(Number(m[1]), m[2] ?? unit2);
     const b = toToman(Number(m[3]), unit2);
-    return { budget: { min: Math.min(a, b), max: Math.max(a, b) }, rest: norm.replace(m[0], ' ') };
+    return { budget: { min: Math.min(a, b), max: Math.max(a, b) }, rest: norm.replace(m[0], ' '), mode: 'range' };
   }
   m = norm.match(MAX_RE);
   // «تا ۲ کیلومتر» is a radius, not a budget: require a unit or a number big enough to be a price
   if (m && (m[2] || Number(m[1]) >= 10) && !/^\s*(کیلومتر|متر|کیلو)/u.test(norm.slice((m.index ?? 0) + m[0].length))) {
-    return { budget: { max: toToman(Number(m[1]), m[2]) }, rest: norm.replace(m[0], ' ') };
+    return { budget: { max: toToman(Number(m[1]), m[2]) }, rest: norm.replace(m[0], ' '), mode: 'max' };
+  }
+  m = norm.match(MIN_RE);
+  if (m) {
+    const v = m[1] ? toToman(Number(m[1]), m[2]) : toToman(Number(m[3]), m[4]);
+    return { budget: { min: v }, rest: norm.replace(m[0], ' '), mode: 'min' };
   }
   m = norm.match(ABOUT_RE);
   if (m) {
     const v = toToman(Number(m[1]), m[2]);
-    return { budget: { min: Math.round(v * 0.8), max: Math.round(v * 1.1) }, rest: norm.replace(m[0], ' ') };
+    return { budget: { min: Math.round(v * 0.8), max: Math.round(v * 1.1) }, rest: norm.replace(m[0], ' '), mode: 'about', amount: v };
   }
   m = norm.match(PLAIN_RE);
   if (m) {
     const v = m[1] ? toToman(Number(m[1]), m[2]) : m[3] ? Number(m[3]) * 1e3 : toToman(Number(m[4]), 'تومن');
-    return { budget: { min: Math.round(v * 0.8), max: Math.round(v * 1.1) }, rest: norm.replace(m[0], ' ') };
+    return { budget: { min: Math.round(v * 0.8), max: Math.round(v * 1.1) }, rest: norm.replace(m[0], ' '), mode: 'plain', amount: v };
   }
   return { rest: norm };
 }
