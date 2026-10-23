@@ -1,11 +1,11 @@
 // Drives the demo scenario (spec §13) on a 390px phone (or a 1440px desktop) and saves a screenshot per step.
-// Usage: pnpm scenario [baseUrl] [--out=docs/screenshots] [--upto=8] [--desktop] [--dark]
+// Usage: pnpm scenario [baseUrl] [--out=docs/screenshots] [--upto=9] [--desktop] [--dark]
 import { chromium, type Page } from 'playwright-core';
 import fs from 'node:fs';
 
 const base = process.argv.find((a) => a.startsWith('http')) || process.env.APP_URL || 'http://localhost:3010';
 const out = process.argv.find((a) => a.startsWith('--out='))?.slice(6) || 'docs/screenshots/tmp';
-const upto = Number(process.argv.find((a) => a.startsWith('--upto='))?.slice(7) || 8);
+const upto = Number(process.argv.find((a) => a.startsWith('--upto='))?.slice(7) || 9);
 const dark = process.argv.includes('--dark');
 const desktop = process.argv.includes('--desktop');
 const USER = 'داور';
@@ -34,6 +34,15 @@ async function snap(page: Page, name: string, locator?: string, which: 'first' |
 /** Extra screenshot that does not shift the numbering of the others (e.g. 07b-map-type-filter.png). */
 async function snapExtra(page: Page, name: string) {
   const file = `${out}/${String(shot).padStart(2, '0')}b-${name}.png`;
+  await page.waitForTimeout(350);
+  await page.screenshot({ path: file });
+  console.log(`      📸 ${file}`);
+}
+
+/** Screenshot with a fixed name (same file name on phone and desktop runs). */
+async function snapAs(page: Page, name: string, locator?: string) {
+  const file = `${out}/${name}.png`;
+  if (locator) await page.locator(locator).last().evaluate((n) => n.scrollIntoView({ block: 'start', inline: 'nearest' })).catch(() => {});
   await page.waitForTimeout(350);
   await page.screenshot({ path: file });
   console.log(`      📸 ${file}`);
@@ -235,6 +244,34 @@ async function main() {
   check('8. previous chat resumes with its cards (plan, follow-ups, sellers)', /تابلو پیگیری/.test(resumed) && /برنامه مراجعه/.test(resumed) && /فروشنده در شعاع/.test(resumed));
   check('8. URL carries the chat id', /[?&]c=[0-9a-f-]{36}/.test(page.url()), page.url());
   await snap(page, 'resumed-chat', 'section[data-plan-id]');
+  if (upto < 9) return finish();
+
+  // 9) a compound request is one mission: locate → products in the band → widen the radius → follow up → one report
+  await page.getByRole('button', { name: 'گفتگوی تازه' }).filter({ visible: true }).first().click();
+  const missionChip = page.locator('[data-mission-chip]');
+  await missionChip.waitFor({ timeout: 20_000 });
+  const chatBefore = chatCalls.length;
+  await missionChip.click();
+  const progress = page.locator('[data-mission-progress]').last();
+  await progress.waitFor({ timeout: 30_000 });
+  await progress.getByText(/پیام به|تماس با/).waitFor({ timeout: 30_000 }).catch(() => {});
+  await snapAs(page, '22-mission-progress', '[data-mission-progress]');
+  const result = page.locator('[data-mission-result]').last();
+  await result.waitFor({ timeout: 60_000 });
+  await waitIdle(page);
+  const report = await result.innerText();
+  const coverage = await result.locator('[data-coverage]').innerText().catch(() => '');
+  const rows = await result.locator('[data-mission-row]').filter({ visible: true }).count();
+  check(
+    '9. compound request runs as one mission (one chat call, all steps)',
+    chatCalls.length - chatBefore === 1 && (await page.locator('[data-mission-progress][data-done="true"]').count()) >= 1,
+    `chat calls: ${chatCalls.length - chatBefore}`,
+  );
+  check('9. understood: Samsung phone, band ۴۵–۵۵ million, سعادت‌آباد', /گوشی سامسونگ/.test(report) && /۴۵–۵۵/.test(report) && /سعادت‌آباد/.test(report));
+  check('9. coverage note: no listed sellers in the area itself, radius widened', /ثبت نشده/.test(coverage) && /ترب/.test(coverage), coverage.slice(0, 120));
+  check('9. sellers followed up and awaited, open/closed reported', rows >= 1 && /تأیید شد|ناموجود|قیمت جدید|پاسخ نداد/.test(report) && /باز است|بسته|ساعت کاری/.test(report), `${rows} rows`);
+  check('9. recommendation or an explicit «پیشنهادی ندارم چون…»', /پیشنهاد:|پیشنهادی ندارم چون|هنوز پیشنهاد قطعی/.test(report));
+  await snapAs(page, '23-mission-result', '[data-mission-result]');
 
   return finish();
 
