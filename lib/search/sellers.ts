@@ -4,6 +4,7 @@ import { openState, todayHoursText, hoursKnown, type WeeklyHours } from '../data
 import { floorText } from '../data/mall';
 import { toFaDigits } from '../fa/digits';
 import type { Freshness, PriceFlag } from '../data/quality';
+import type { ShopType } from '../data/shop-types';
 import {
   activeFilters,
   FILTER_LABEL,
@@ -14,6 +15,7 @@ import {
   type Filters,
   type Intent,
 } from './score';
+import { shopTypeOf } from './shop-types';
 
 export type MallRef = { key: string | null; name: string | null; floor_label: string | null; floor_num: number | null; unit_label: string | null; unit_kind: string | null };
 
@@ -341,6 +343,8 @@ export async function findSellers(input: FindSellersInput): Promise<SellersResul
 export type ShopDetails = {
   shop_id: string;
   shop_name: string;
+  /** map/filter type derived from the activity categories (lib/data/shop-type-rules.ts) */
+  shop_type: ShopType;
   address: string | null;
   lat: number;
   lon: number;
@@ -413,6 +417,7 @@ export async function shopDetails(shopId: string, opts: { category?: string | nu
   return {
     shop_id: s.shop_id,
     shop_name: s.name,
+    shop_type: await shopTypeOf(s.shop_id),
     address: s.address,
     lat: s.lat,
     lon: s.lon,
