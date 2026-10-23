@@ -144,10 +144,32 @@ Acceptance:
 - `pnpm scenario`: **28/28** on 390 px, **28/28** with `--desktop` and **28/28** against the rebuilt Docker image (`http://localhost:8088`) (new checks: type chips with counts, a chip filters the map, the shop sheet shows the type). Screenshots `07-map.png`, `07b-map-type-filter.png` (phone and desktop).
 - Around the default location (1 km): 2,692 shops besides the sellers — mobile 494, CCTV 187, tools 177, audio/video 166, …, 724 «فعالیت ثبت نشده».
 
+## Post-v1 — Missions: compound requests carried out end to end ✅
+
+Request (owner, 2026-10-23): «من یه گوشی سامسونگ حدود قیمت ۵۰ میلیون تومن میخوام. محدوده سعادت آباد باشه. و خودت بپرس ببین قیمت‌هاشون آپدیت هست یا نه و اینکه الان باز هستند.» was not carried out; such a message must run as one mission and come back as one report.
+
+Root causes, verified:
+1. Places were limited to the 30 `location_label`s and mall names — «سعادت آباد» was unknown → gazetteer (#62).
+2. Sparse data outside the centre: around سعادت‌آباد 0 shops within 1 km and 1 Samsung-phone seller within 8 km (2.1 km away, near «آسمان») → coverage loop + honest notes (#63), in-band offer per shop (#64).
+3. Follow-ups were fire-and-forget → `awaitFollowups` (≤ 8 s) inside the mission (#67).
+4. `stepCountIs(5)` and no end-to-end instruction → direct mission execution in auto mode (#59), 10 steps, prompt rule (#74).
+5. «حدود ۵۰ میلیون» → band 45–55 M; «آپدیت هست یا نه» → freshness + follow-up; «الان باز هستند» → open filter + per-row open/closed (#61, #68).
+Also found while testing: the demo clock could be missing in a brand-new chat (#72) and the routing model invented a budget (#73).
+
+Done:
+- `lib/agent/mission/`: `extract.ts` (rules + LLM merge, mission detection), `gazetteer.ts` + `geocode.ts`, `coverage.ts`, `verdict.ts`, `run.ts` (locate → products → sellers with widening → follow-ups awaited → optional plan → report), `types.ts`; `run_mission` tool; `awaitFollowups`; `/api/chat` auto mode + `data-mission-progress` parts; location sheet shows gazetteer places with «N فروشگاه در ۱ کیلومتری».
+- UI: `MissionProgressCard` (live steps, collapses), `MissionResultCard` («این‌طور فهمیدم» chips with ×, coverage banner, table on wide columns / stacked rows on phones, verdict pills, recommendation or «پیشنهادی ندارم چون…», live follow-up cells, next-step chips, embedded plan), 5th hero chip with the failing example.
+- Tests: 27 mission unit tests (15 Persian phrasings, gazetteer variants, coverage loop, verdicts, chip edits) — 169 in total; `scripts/missions.ts` (8 compound requests) in `pnpm golden`.
+
+Acceptance:
+- `pnpm typecheck && pnpm lint && pnpm test` green (169 unit tests); `pnpm golden`: products 15/15, sellers 10/10, **missions 45/45**.
+- `pnpm scenario` (live OpenAI, demo time Sunday 16:00) with the new step 9 (hero mission chip): **33/33** on 390 px and **33/33** with `--desktop`; screenshots `22-mission-progress.png`, `23-mission-result.png` (phone and desktop).
+- The failing example now: سعادت‌آباد found → 4 Samsung phones in 45–55 M → 0 sellers within 1, 2 km, 1 within 3–8 km → the seller is asked and answers within the turn → report: coverage note («در خود سعادت‌آباد … ثبت نشده؛ نزدیک‌ترین‌ها در فاصله ۲٫۱ کیلومتر (آسمان)»), open/closed per row, verdict, and either a recommendation or «پیشنهادی ندارم چون…», plus «مرکز شهر را هم ببین».
+
 ## Final status
 
-- `pnpm typecheck && pnpm lint && pnpm test && pnpm golden` → green (142 unit tests; golden 15/15 queries + 10/10 seller checks).
-- Demo scenario §13 steps 1–7 plus history/memory (step 8): `pnpm scenario` 28/28 (phone, desktop and Docker), `?demo_time=` and `/demo-reset?name=` supported.
+- `pnpm typecheck && pnpm lint && pnpm test && pnpm golden` → green (169 unit tests; golden 15/15 queries + 10/10 seller checks + 45/45 mission checks).
+- Demo scenario §13 steps 1–7, history/memory (step 8) and a compound mission (step 9): `pnpm scenario` 33/33 (phone, desktop and Docker), `?demo_time=` and `/demo-reset?name=` supported.
 - All three LLM providers verified live on 2026-10-23 (`pnpm llm-check`: 3 ok).
 - CI: GitHub Actions (install → typecheck → lint → test) on every push.
 - Parsed malls for 4,088 shops (after parser refinements in M1).

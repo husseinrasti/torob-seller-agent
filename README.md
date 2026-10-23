@@ -28,6 +28,7 @@
 | **4. Follow up & go** | Simulated message/call follow‑ups with a live board (confirmed / out of stock / new price / no answer + transcripts). Out of stock → **alternatives automatically** (same product in the same mall first, then similar products ±20%). A visit plan ordered by mall and floor with ETA, open‑at‑arrival checks, navigation links (Neshan, Google Maps, OSM), a share link and an in‑store checklist. |
 
 ### Around the four steps
+- **One message, one mission.** A compound request — «من یه گوشی سامسونگ حدود قیمت ۵۰ میلیون تومن میخوام. محدوده سعادت آباد باشه. و خودت بپرس ببین قیمت‌هاشون آپدیت هست یا نه و اینکه الان باز هستند.» — is carried out end to end and reported once: the place is found (117‑place Tehran gazetteer + the dataset's neighbourhoods and malls), «حدود ۵۰ میلیون» becomes a 45–55 M band, the radius widens until there are sellers and the report says plainly when the area itself has none in Torob's data, sellers are asked (simulated) and their replies awaited, and every row gets a verdict (پیشنهادی / قابل قبول / توصیه نمی‌شود / نامشخص) with a reason — or «پیشنهادی ندارم چون…». Steps stream live; chips edit the constraints ([DECISIONS #58–74](docs/DECISIONS.md)).
 - **Phone and desktop.** On a phone: one column, map and history in sheets. From 1024 px: chat history · conversation · live map side by side; cards reflow with container queries (two seller cards per row when there is room).
 - **Sign in with just a name** («اسمت چیه؟») — chats are saved per user. There is no password: whoever types the same name opens the same history (a deliberate hackathon trade‑off, [DECISIONS #43](docs/DECISIONS.md)).
 - **Chat history.** Previous chats are listed with their title and last activity (sidebar on desktop, sheet on mobile); opening one brings back every card — seller list, follow‑up board with its outcomes, visit plan — and continues the conversation. Each chat has its own URL (`/?c=<id>`), so back/forward and reload work.
@@ -46,9 +47,9 @@
 |---|---|
 | **Product (75)** | All four steps end to end; mall → floor → unit navigation from free‑text addresses (4,088 shops parsed); price‑freshness and suspicious‑price flags; category‑only shops separated; follow‑ups with automatic alternatives; visit plan with open‑at‑arrival warnings; shareable plan; checklist; every shop of the area on the map by type, filterable and selectable; per‑user chat history with resume. |
 | **UX (75)** | Mobile‑first RTL (390 px) **and** a desktop layout (≥ 1024 px: history · chat · live map); Vazirmatn, Persian digits everywhere; chat **plus** structured controls: sticky ContextBar (location, radius, price cap, conditions, intent) re‑filters the list **instantly without the LLM**; generative UI cards; skeletons; empty states with one tappable fix; 44 px targets; dark mode; Lighthouse mobile **92 / 100 / 100** (M5 build). |
-| **Intelligence (50)** | Vercel AI SDK v7 agent with 10 tools; deterministic‑first category routing (product votes + trigram) with LLM refinement; Persian budget parser; explainable seller score and «چرا این اول شد؟» grounded in `score_breakdown`; proactive rules (stale price → follow up, out of stock → alternatives, confirmed → plan); memory across chats (usual location/radius, recent searches and products); automatic fallback to a rule‑based model when the provider fails. |
+| **Intelligence (50)** | Vercel AI SDK v7 agent with 11 tools; deterministic‑first category routing (product votes + trigram) with LLM refinement; Persian budget parser; explainable seller score and «چرا این اول شد؟» grounded in `score_breakdown`; proactive rules (stale price → follow up, out of stock → alternatives, confirmed → plan); memory across chats (usual location/radius, recent searches and products); compound requests run as one deterministic mission with the LLM at the edges (extraction, ≤ 3‑sentence summary); automatic fallback to a rule‑based model when the provider fails. |
 | **Deploy (40)** | `docker compose up -d` → PostgreSQL 16, app (Next standalone, non‑root, healthcheck), Caddy (automatic HTTPS); migrations + **auto‑seed** on first boot (~30 s); `/api/healthz`; exact VPS commands in [docs/DEPLOY.md](docs/DEPLOY.md). |
-| **Engineering (40)** | TypeScript end to end, Drizzle schema & migrations, COPY‑based seed with 4 streaming passes, pure tested modules (142 unit tests), golden search suite, Playwright scenario (28 checks on phone and desktop viewports), CI (typecheck · lint · test), decisions log ([docs/DECISIONS.md](docs/DECISIONS.md)). |
+| **Engineering (40)** | TypeScript end to end, Drizzle schema & migrations, COPY‑based seed with 4 streaming passes, pure tested modules (169 unit tests), golden search + mission suites, Playwright scenario (33 checks on phone and desktop viewports), CI (typecheck · lint · test), decisions log ([docs/DECISIONS.md](docs/DECISIONS.md)). |
 | **Dataset (20)** | Uses all three CSVs: Persian normalization (ی/ک, digits, ZWNJ), mall/floor/unit parser with spelling unification (علاالدین/علاءالدین/علائدین…), hours with `declared/closed/unsupported`, price age & suspicious‑price flags vs product median, payment providers with in‑person vs declared channel, warranty parsing, brand inference for the 75 % of products without a brand. |
 
 ## Architecture
@@ -65,7 +66,7 @@ flowchart LR
     SELL["/api/sellers · /api/session<br/>(no LLM)"]
     FU["/api/followup · /api/plan · /api/shop"]
     ACC["/api/auth · /api/me · /api/chats<br/>/api/shops/near"]
-    TOOLS["Tools: search_products · compare_products · set_context<br/>find_sellers · shop_details · contact_seller<br/>find_alternatives · plan_trip · purchase_checklist · clarify_need"]
+    TOOLS["Tools: search_products · compare_products · set_context<br/>find_sellers · shop_details · contact_seller<br/>find_alternatives · plan_trip · purchase_checklist · clarify_need<br/>run_mission (compound requests → one report)"]
     SIM["Seller simulator<br/>sha256(SIM_SALT+offer_id)"]
   end
   LLM["LLM provider (env switch)<br/>OpenAI · Google · OpenRouter<br/>↳ offline rule model fallback"]
@@ -85,7 +86,7 @@ flowchart LR
   CADDY["Caddy (HTTPS)"] --> App
 ```
 
-**How a turn works.** Free text goes to `streamText` with the tools; the model decides. Taps on cards («فروشنده‌های نزدیک», «مقایسه», «پیگیری ۳ تای اول», «برنامه مراجعه») are messages with `metadata.action`: the server runs that tool immediately (same code as the LLM's call), streams the card, then the LLM adds one or two sentences. ContextBar changes never call the LLM: they `PATCH /api/session` and the latest seller list re‑fetches `/api/sellers` in place (and is written back into the chat history so the agent explains what the user sees).
+**How a turn works.** Free text goes to `streamText` with the tools; the model decides. Taps on cards («فروشنده‌های نزدیک», «مقایسه», «پیگیری ۳ تای اول», «برنامه مراجعه») are messages with `metadata.action`: the server runs that tool immediately (same code as the LLM's call), streams the card, then the LLM adds one or two sentences. A message with two or more goals, or one that delegates a check («خودت بپرس»، «چک کن»…), is detected by rules and runs as the `run_mission` action the same way (live `data-mission-progress` parts, then ≤ 3 sentences from the model). ContextBar changes never call the LLM: they `PATCH /api/session` and the latest seller list re‑fetches `/api/sellers` in place (and is written back into the chat history so the agent explains what the user sees).
 
 **Users, chats and memory.** Signing in with a name sets an httpOnly cookie for a `users` row. Each chat is a `sessions` row owned by that user (context state + the UI messages); the client sends the chat id with every request. The server stores the messages when a turn ends; cards that change afterwards (follow‑up outcomes, a re‑filtered seller list) are saved by the client with `PUT /api/chats/<id>/messages`. After each turn, and when the ContextBar location or radius changes, the user's memory (location, radius, recent searches and products) is updated; it is added to the system prompt and seeds the location of new chats.
 
@@ -120,7 +121,7 @@ Without any LLM key the app runs in **offline mode** (rule‑based model; badge 
 
 ```bash
 pnpm typecheck && pnpm lint && pnpm test   # CI runs these
-pnpm golden                                # 15 golden search queries + seller checks (needs the DB)
+pnpm golden                                # 15 golden search queries + seller checks + 8 compound missions (needs the DB)
 pnpm scenario                              # demo scenario §13 + history/memory on a 390 px viewport, screenshots → docs/screenshots/tmp
 pnpm scenario --desktop                    # same on 1440×900 (history sidebar + map column); --dark for dark mode
 pnpm llm-check                             # one tool call per configured provider
@@ -168,6 +169,7 @@ lib/fa          Persian normalization, digits, formatting
 lib/data        mall/floor/unit parser, opening hours, price quality, payments, warranty, shop types from activity categories
 lib/search      query parsing, category routing, product ranking, sellers + score, alternatives, places, shops near a point
 lib/agent       tools, system prompt, chats (session state + messages), memory, suggestions, offline model, checklist
+lib/agent/mission  compound requests: extraction, gazetteer + geocoder, coverage loop, verdicts, executor
 lib/sim         seller simulator, persona transcripts, follow-up service
 lib/plan        visit planner
 scripts         seed, golden, scenario, smoke, llm-check, tune-salt, shop-types-report
