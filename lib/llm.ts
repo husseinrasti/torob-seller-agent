@@ -44,7 +44,7 @@ export function model(kind: ModelKind = 'chat') {
 }
 
 /** Photo search (F1): `LLM_VISION_MODEL`, else a multimodal default per provider, else the chat model. */
-export const VISION_DEFAULTS: Record<string, string> = { openai: 'gpt-4.1-mini', google: 'gemini-3.1-flash-lite', openrouter: 'openai/gpt-4.1-mini' };
+export const VISION_DEFAULTS: Record<string, string> = { openai: 'gpt-4.1-mini', google: 'gemini-3.1-flash-lite', openrouter: 'google/gemini-2.5-flash' };
 
 export function visionModelId(): string {
   const p = llmProvider();

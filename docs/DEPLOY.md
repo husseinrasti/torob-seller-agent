@@ -66,7 +66,7 @@ OPENAI_API_KEY=sk-...               # the key matching LLM_PROVIDER
 ```
 
 Keep `AUTO_SEED=true`, `DB_PORT=5432`, `HTTP_PORT=80`, `HTTPS_PORT=443`, `SIM_SALT=hamrah-40`.
-Optional: `LLM_VISION_MODEL=<multimodal model>` for photo search (defaults: openai → `LLM_MODEL`, google → `gemini-3.1-flash-lite`, openrouter → `openai/gpt-4.1-mini`; check with `pnpm vision-check`). Also `NPM_REGISTRY=<npm mirror URL>` if `registry.npmjs.org` is slow or blocked; `OPENAI_BASE_URL=<compatible proxy>` if OpenAI is not reachable from the server (or use OpenRouter).
+Optional: `LLM_VISION_MODEL=<multimodal model>` for photo search (defaults: openai → `LLM_MODEL`, google → `gemini-3.1-flash-lite`, openrouter → `google/gemini-2.5-flash`; check with `pnpm vision-check`). Also `NPM_REGISTRY=<npm mirror URL>` if `registry.npmjs.org` is slow or blocked; `OPENAI_BASE_URL=<compatible proxy>` if OpenAI is not reachable from the server (or use OpenRouter).
 
 > `POSTGRES_PASSWORD` is applied when the database volume is first created. To change it later run `docker compose down -v` (this deletes the database; the app re-seeds on the next start).
 
