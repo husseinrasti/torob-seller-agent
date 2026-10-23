@@ -29,7 +29,7 @@ export function Checklist({ output }: { output: ChecklistOutput }) {
           <li key={i}>
             <label className="flex min-h-12 cursor-pointer items-start gap-3 px-3 py-2.5 text-sm leading-6">
               <Checkbox className="mt-1" checked={done[i]} onCheckedChange={(v) => setDone((d) => d.map((x, j) => (j === i ? Boolean(v) : x)))} />
-              <span className={done[i] ? 'text-muted-foreground line-through' : ''}>{it}</span>
+              <span className={done[i] ? 'text-muted-foreground line-through' : ''}>{faText(it)}</span>
             </label>
           </li>
         ))}

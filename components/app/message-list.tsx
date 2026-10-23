@@ -5,6 +5,7 @@ import type { UIMessage } from 'ai';
 import { BellRing, Bot, Loader2 } from 'lucide-react';
 import { Skeleton } from '@/components/ui/skeleton';
 import type { ActionMetadata, ToolOutput } from '@/lib/agent/types';
+import { faText } from '@/lib/fa/format';
 import { ProductCards } from '@/components/cards/product-cards';
 import { CompareTable } from '@/components/cards/compare-table';
 import { SellerList } from '@/components/cards/seller-list';
@@ -67,6 +68,7 @@ function AssistantText({ text }: { text: string }) {
         {text
           .split(/\n{2,}|\n(?=[-•])/)
           .filter(Boolean)
+          .map((para) => faText(para))
           .map((para, i) => (
             <p key={i}>
               {para.split(/(\*\*[^*]+\*\*)/g).map((seg, j) =>

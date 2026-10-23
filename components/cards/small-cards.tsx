@@ -3,12 +3,13 @@
 import { MapPin, Settings2, TriangleAlert } from 'lucide-react';
 import type { ClarifyOutput, ContextOutput } from '@/lib/agent/types';
 import { useChatActions } from '@/components/app/chat-actions';
+import { faText } from '@/lib/fa/format';
 
 export function ClarifyChips({ output, isLast }: { output: ClarifyOutput; isLast: boolean }) {
   const { sendText, busy } = useChatActions();
   return (
     <div className="space-y-2 rounded-2xl border bg-card p-3">
-      <p className="text-sm font-medium">{output.question}</p>
+      <p className="text-sm font-medium">{faText(output.question)}</p>
       <div className="flex flex-wrap gap-2">
         {output.chips.map((c) => (
           <button
@@ -17,7 +18,7 @@ export function ClarifyChips({ output, isLast }: { output: ClarifyOutput; isLast
             onClick={() => sendText(c)}
             className="h-11 rounded-full border bg-background px-4 text-sm transition hover:bg-muted disabled:opacity-50"
           >
-            {c}
+            {faText(c)}
           </button>
         ))}
       </div>
