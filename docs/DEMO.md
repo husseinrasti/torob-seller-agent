@@ -9,15 +9,18 @@ Goal: from «گوشی سامسونگ تا ۶۰ میلیون» to a confirmed, ma
 3. With an LLM key the agent speaks freely; without one the header shows «حالت آفلاین» and the same flow runs with the rule‑based model (all numbers still come from tools).
 4. `SIM_SALT=hamrah-40` gives the mixed outcomes below for the top‑3 sellers.
 
-The whole flow is automated by `pnpm scenario <app-url>` (33 checks incl. the mission as step 9; `--desktop` for 1440×900, `--dark` for dark mode); the screenshots below come from it (desktop ones in `docs/screenshots/desktop/`).
+The whole flow is automated by `pnpm scenario <app-url>` (46 checks incl. the mission as step 9 and the feature-pack beats; `--desktop` for 1440×900, `--dark` for dark mode); the screenshots below come from it (desktop ones in `docs/screenshots/desktop/`).
 
 ## Script
 
 | # | Tap / say | What appears | Point to make | Screenshot |
 |---|---|---|---|---|
-| 0 | Type a name in «اسمت چیه؟» → «ورود» | Hero «سلام داور!» with 4 scenario chips, «موقعیت من», «انتخاب روی نقشه» | Sign in with just a name; chats are saved per user | `01-login.png`, `02-home.png` |
+| 0 | Type a name in «اسمت چیه؟» → «ورود» | Hero «سلام داور!» with 4 scenario chips + the mission chip, «الان توی پاساژ علاءالدینم» · «گوشی + کاور + گلس یکجا», the camera hint, «موقعیت من», «انتخاب روی نقشه» | Sign in with just a name; chats are saved per user | `01-login.png`, `02-home.png` |
 | 1 | Tap **«گوشی سامسونگ تا ۶۰ میلیون نزدیک من»** | 4 product cards: A17 128/4 (from ۵۳٬۹۰۰٬۰۰۰ · ۲۶ فروشنده), A07 64/4, A07 128/6, A17 128/6 flagged «کمی بالاتر از بودجه», each with a «چرا» line | Budget parsed deterministically; reasons are templated from data, not invented | `03-products.png` |
 | 1b | *(40 s)* Tap **«گفتگوی تازه»** (＋), then the 5th chip **«مأموریت چندمرحله‌ای»** — the real request that the plain agent used to drop | One mission with live steps: «سعادت‌آباد پیدا شد» → «۴ گوشی در بازه ۴۵–۵۵ میلیون» → «در ۱ کیلومتر: ۰ · در ۲ کیلومتر: ۰ · در ۳ کیلومتر: ۱ …» → «پیام به ۱ فروشنده…» → one report: «این‌طور فهمیدم» chips (× removes one and re-runs), the coverage note (no listed seller in سعادت‌آباد itself; the nearest is 2.1 km away, near «آسمان»), the seller row with price, freshness, open/closed and the seller's reply, a verdict, and a recommendation or «پیشنهادی ندارم چون…», plus «مرکز شهر را هم ببین». Then «گفتگوهای قبلی» → back to the first chat for step 2 | One message → carried out to the end; dataset limits said plainly, nothing invented | `22-mission-progress.png`, `23-mission-result.png` |
+| 1c | *(20 s, still in the mission chat)* Tap the **camera button** next to the input → pick `tests/fixtures/vision/shelf-tag.jpg` (or photograph a real price tag) | The photo as a thumbnail; «در عکس: سامسونگ Galaxy A17 4G» → «گوشی سامسونگ A17 4G» with «همین است» / «نه، این نیست»; «قیمت روی برچسب: ۶۴٬۵۰۰٬۰۰۰ تومان · ۸٪ بالای میانه بازار», the market range and the cheaper sellers nearby; «عکس … ذخیره نمی‌شود» | In the shop: a photo of the tag answers «is this a fair price here?» — F1 | `32-photo-match.png` |
+| 1d | *(20 s)* Type **«الان توی پاساژ علاءالدینم»** | The mall floor by floor: floor tabs with seller counts, the A17 sellers first (price · آخرین تغییر قیمت · موجودی), «همسایه جایگزین» for shops of the same category, «پیگیری همه‌ی این طبقه», the mall's hours, nearby malls | Inside a mall the question is «which floor, which unit» — F2 | `29-mall-view.png` |
+| 1e | *(30 s — fits: the whole script stays under 5 min)* Type **«گوشی A17، کاور A17، گلس، پاوربانک ۲۰ هزار، همه یکجا نزدیک فردوسی»** → **«پیگیری همه»** | «۴ از ۴ قلم یکجا در پاساژ علاءالدین · ۱ توقف», BasketBar above the input, every seller asked; an out-of-stock seller is replaced and asked too; the visit plan | One trip for the phone and its accessories — F3 | `30-basket-plan.png`, `31-basket-verified.png` |
 | 2 | Tap **«مقایسه»** on the first two → **«مقایسه کن»** → **«انتخاب»** under A17 128/4 | Compare table (differing specs + price/seller rows), then the seller list | Step 1 → step 2 without typing | `04-compare.png` |
 | 3 | — | «۲۴ فروشنده در شعاع ۱ کیلومتر», cluster chips (چارسو ۶، علاءالدین ۶، بازار موبایل ایران ۴، بزرگمهر ۲، خانه موبایل ۲); cards with mall · floor · unit | Mall navigation parsed from free‑text addresses | `05-sellers.png`, `06-seller-cards.png` |
 | 3b | Tap **«نقشه»** (desktop: the map column) | Radius circle, **every shop of the area** with an icon for its type (teal: lists products · gray: no listings · amber bubble: only the activity category matches), shops of one building grouped into pills with a shop icon and their count, the seller list as numbered pins; type chips with counts above the map → tap **«موبایل و لوازم جانبی»** and back to «همه»; tap pin **«۱»** → shop sheet: type, address with mall/floor/unit, today's hours, the chosen product's offer with «پیگیری» / «به برنامه», score shares, other products. Tapping a pill zooms in; inside a mall it lists the shops | Any shop on the map can be found by type, opened and acted on | `07-map.png`, `07b-map-type-filter.png`, `08-map-shop-details.png` |
@@ -30,7 +33,7 @@ The whole flow is automated by `pnpm scenario <app-url>` (33 checks incl. the mi
 | 8 | Tap **«گفتگوی تازه»** (＋) | «سلام داور!» + «از جایی که مانده بودیم»: the last search as a chip and «ادامه «گوشی سامسونگ تا ۶۰ میلیون…»» | Memory across chats (location, radius, searches, products) | `19-memory-new-chat.png` |
 | 8b | Open **«گفتگوهای قبلی»** (☰ on a phone, sidebar on desktop) and tap the previous chat (or «ادامه») | The whole chat comes back — seller list, follow‑up board with its outcomes, visit plan — and can be continued; the URL carries `?c=<chat id>` | History and resume | `20-history.png`, `21-resumed-chat.png` |
 
-## More beats (feature pack 2) — use as time allows
+## More beats (feature pack 2) — F1, F2, F3 are in the script above; the rest as time allows
 
 | Feature | Tap / say | What appears | Point to make | Screenshot |
 |---|---|---|---|---|

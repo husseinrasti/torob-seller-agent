@@ -14,6 +14,9 @@ export const HERO_CHIPS = [
 ];
 
 /** A compound request run as one mission (5th hero chip; spec example that the plain agent used to drop). */
+/** Feature pack 2 entry points on the hero (F2 in-mall, F3 basket); F1 is the composer's camera button. */
+export const HERO_NEW = ['الان توی پاساژ علاءالدینم', 'گوشی + کاور + گلس یکجا'];
+
 export const MISSION_EXAMPLE =
   'من یه گوشی سامسونگ حدود قیمت ۵۰ میلیون تومن میخوام. محدوده سعادت آباد باشه. و خودت بپرس ببین قیمت‌هاشون آپدیت هست یا نه و اینکه الان باز هستند.';
 

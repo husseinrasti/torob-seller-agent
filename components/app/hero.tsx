@@ -1,10 +1,10 @@
 'use client';
 
 import { useState } from 'react';
-import { Building2, Clock3, Crosshair, History, ListChecks, Map as MapIcon, MessageSquare, Search, ShieldCheck, Sparkles } from 'lucide-react';
+import { Building2, Camera, Clock3, Crosshair, History, ListChecks, Map as MapIcon, MessageSquare, Search, ShieldCheck, ShoppingBasket, Sparkles } from 'lucide-react';
 import { toast } from 'sonner';
 import { Button } from '@/components/ui/button';
-import { HERO_CHIPS, MISSION_EXAMPLE } from '@/lib/agent/suggest';
+import { HERO_CHIPS, HERO_NEW, MISSION_EXAMPLE } from '@/lib/agent/suggest';
 import { faText } from '@/lib/fa/format';
 import type { UserMemory } from '@/lib/agent/memory';
 import type { ChatSummary } from '@/lib/agent/state';
@@ -112,6 +112,24 @@ export function Hero({
             <span className="leading-6">{MISSION_EXAMPLE}</span>
           </button>
         </div>
+        <div className="flex flex-wrap gap-1.5 pt-1">
+          {HERO_NEW.map((t, i) => (
+            <button
+              key={t}
+              disabled={busy}
+              data-hero-new={i === 0 ? 'mall' : 'basket'}
+              onClick={() => sendText(t)}
+              className="inline-flex h-9 items-center gap-1 rounded-full border border-primary/30 bg-background px-3 text-xs font-medium hover:bg-accent disabled:opacity-60"
+            >
+              {i === 0 ? <Building2 className="size-3.5 text-primary" /> : <ShoppingBasket className="size-3.5 text-primary" />}
+              {t}
+            </button>
+          ))}
+        </div>
+        <p data-camera-hint className="flex items-center gap-1.5 text-xs text-muted-foreground">
+          <Camera className="size-3.5 text-primary" />
+          عکس جعبه یا برچسب قیمت داری؟ دکمه‌ی دوربین کنار کادر پیام را بزن.
+        </p>
       </div>
 
       <div className="rounded-2xl border bg-card p-3">

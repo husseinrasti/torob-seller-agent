@@ -79,6 +79,7 @@ async function main() {
   // demo user with a clean history and memory
   await page.goto(`${base}/demo-reset?demo_time=${DEMO_TIME}&name=${encodeURIComponent(USER)}`, { waitUntil: 'networkidle' });
   await page.getByRole('button', { name: 'گوشی سامسونگ تا ۶۰ میلیون نزدیک من' }).waitFor({ timeout: 30_000 });
+  check('0. hero: in-mall and basket chips, camera hint', (await page.locator('[data-hero-new]').count()) === 2 && (await page.locator('[data-camera-hint]').isVisible()) && (await page.locator('[data-photo-input]').count()) === 1);
   await snap(page, 'home');
 
   // 1) chip → product cards
