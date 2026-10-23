@@ -10,6 +10,7 @@ import type { MissionResult } from './mission/types';
 import type { VisitTimeOutput } from '../search/visit-time';
 import type { SpecAnswerOutput } from './spec-qa';
 import type { RankExplainOutput } from './tools';
+import type { SellerMessageOutput } from '../sim/seller-message';
 
 export type ClarifyOutput = { ui: 'clarify'; question: string; chips: string[] };
 
@@ -65,6 +66,7 @@ export type ToolOutput =
   | VisitTimeOutput
   | SpecAnswerOutput
   | RankExplainOutput
+  | SellerMessageOutput
   | ErrorOutput;
 
 /** Message metadata used by UI actions: run `tool` with `input` right away, then let the agent comment. */

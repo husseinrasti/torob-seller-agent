@@ -208,6 +208,23 @@ async function main() {
   const visitText = await visit.innerText();
   check('F11. best time to visit (window, Friday, unknown hours)', /یکشنبه بین [۰-۹]+ تا [۰-۹]+، [۰-۹]+٪/.test(visitText) && /جمعه [۰-۹]+٪ تعطیل/.test(visitText), visitText.split('\n').slice(-1)[0]);
   await snapAs(page, '25-visit-time', '[data-visit-time]');
+
+  // F4) «خودم پیام بدهم»: a ready-to-send message (title, listed price, its age, mall/floor/unit) + WhatsApp/SMS links
+  const card1 = page.locator('article[id^="shop-"]').first();
+  await card1.getByRole('button', { name: 'پیگیری' }).click();
+  await card1.getByRole('button', { name: 'خودم پیام بدهم' }).click();
+  const msgBox = page.locator('[data-seller-message] textarea');
+  await msgBox.waitFor({ timeout: 20_000 });
+  const msg = await msgBox.inputValue();
+  const wa = await page.locator('[data-seller-message] a[data-channel="whatsapp"]').getAttribute('href').catch(() => null);
+  check(
+    'F4. ready-to-send seller message (title, price, price age, mall/floor/unit; WhatsApp link with the text)',
+    /A17/.test(msg) && /[۰-۹٬]+ تومان/.test(msg) && /آخرین تغییر قیمت/.test(msg) && /پاساژ/.test(msg) && Boolean(wa?.startsWith('https://wa.me/98') && wa.includes(encodeURIComponent('سلام'))),
+    msg.split('\n')[1]?.slice(0, 90),
+  );
+  await snapAs(page, '27-seller-message');
+  await page.keyboard.press('Escape');
+  await page.waitForTimeout(300);
   if (upto < 5) return finish();
 
   // 5) follow up the top 3 → live board with mixed outcomes → automatic alternatives

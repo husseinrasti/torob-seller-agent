@@ -1,7 +1,7 @@
 'use client';
 
 import { useState } from 'react';
-import { Info, ListPlus, ListChecks, MessageCircle, Navigation, Phone, PhoneCall, Sparkles } from 'lucide-react';
+import { Info, ListPlus, ListChecks, MessageCircle, MessageSquareText, Navigation, Phone, PhoneCall, Sparkles } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { cn } from '@/lib/utils';
 import { formatDistance } from '@/lib/fa/format';
@@ -12,12 +12,14 @@ import { useSession } from '@/components/app/session-context';
 import { AvailabilityBadge, ConditionChips, FreshnessBadge, MallChip, OpenDot, PriceLine, type Availability } from './badges';
 import { ShopDetailsSheet } from './shop-details-sheet';
 import { ShopFacts, TrustDots, TrustLinks } from './trust';
+import { SellerMessageSheet } from './seller-message';
 
 export function SellerCard({ row, rank, availability, productTitle }: { row: SellerRow; rank: number; availability: Availability; productTitle?: string }) {
   const { sendAction, busy } = useChatActions();
   const { state, patch, focusShop } = useSession();
   const [askChannel, setAskChannel] = useState(false);
   const [details, setDetails] = useState(false);
+  const [myMessage, setMyMessage] = useState(false);
   const inPlan = state?.shortlist.includes(row.offer_id) ?? false;
   const followupBusy = availability.status === 'pending' || availability.status === 'contacting';
 
@@ -90,18 +92,33 @@ export function SellerCard({ row, rank, availability, productTitle }: { row: Sel
       )}
 
       {askChannel ? (
-        <div className="mt-2.5 grid grid-cols-3 gap-2">
-          <Button size="sm" className="h-11" onClick={() => follow('message')} disabled={busy}>
-            <MessageCircle className="size-4" />
-            پیام
-          </Button>
-          <Button size="sm" className="h-11" onClick={() => follow('call')} disabled={busy}>
-            <PhoneCall className="size-4" />
-            تماس
-          </Button>
-          <Button size="sm" variant="ghost" className="h-11" onClick={() => setAskChannel(false)}>
-            انصراف
-          </Button>
+        <div className="mt-2.5 space-y-2">
+          <p className="text-[11px] text-muted-foreground">همراه خرید بپرسد (شبیه‌سازی‌شده) یا خودتان پیام بدهید:</p>
+          <div className="grid grid-cols-2 gap-2">
+            <Button size="sm" className="h-11" onClick={() => follow('message')} disabled={busy}>
+              <MessageCircle className="size-4" />
+              پیام بده
+            </Button>
+            <Button size="sm" className="h-11" onClick={() => follow('call')} disabled={busy}>
+              <PhoneCall className="size-4" />
+              تماس بگیر
+            </Button>
+            <Button
+              size="sm"
+              variant="outline"
+              className="h-11"
+              onClick={() => {
+                setAskChannel(false);
+                setMyMessage(true);
+              }}
+            >
+              <MessageSquareText className="size-4" />
+              خودم پیام بدهم
+            </Button>
+            <Button size="sm" variant="ghost" className="h-11" onClick={() => setAskChannel(false)}>
+              انصراف
+            </Button>
+          </div>
         </div>
       ) : (
         <div className="mt-2.5 grid grid-cols-3 gap-2">
@@ -128,6 +145,7 @@ export function SellerCard({ row, rank, availability, productTitle }: { row: Sel
           </Button>
         </div>
       )}
+      {myMessage && <SellerMessageSheet offerId={row.offer_id} onClose={() => setMyMessage(false)} />}
       <ShopDetailsSheet open={details} onOpenChange={setDetails} shopId={row.shop_id} productId={row.product_id} score={row.score_breakdown} />
     </article>
   );

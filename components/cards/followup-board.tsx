@@ -1,7 +1,7 @@
 'use client';
 
 import { useEffect, useRef, useState } from 'react';
-import { BadgeCheck, ChevronDown, Info, ListPlus, MessageCircle, PhoneCall, Search } from 'lucide-react';
+import { BadgeCheck, ChevronDown, Info, ListPlus, MessageCircle, MessageSquareText, PhoneCall, Search } from 'lucide-react';
 import { toast } from 'sonner';
 import { Button } from '@/components/ui/button';
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/components/ui/collapsible';
@@ -15,6 +15,7 @@ import { useChatActions } from '@/components/app/chat-actions';
 import { useFollowups } from '@/components/app/followups-store';
 import { useSession } from '@/components/app/session-context';
 import { AvailabilityBadge } from './badges';
+import { SellerMessageSheet } from './seller-message';
 
 const resolved = (i: FollowupItem) => i.status !== 'contacting' && i.status !== 'pending';
 
@@ -48,6 +49,7 @@ function Transcript({ item }: { item: FollowupItem }) {
 
 function Row({ item }: { item: FollowupItem }) {
   const { sendAction, busy } = useChatActions();
+  const [myMessage, setMyMessage] = useState(false);
   const { state, patch } = useSession();
   const done = resolved(item);
   const inPlan = state?.shortlist.includes(item.offer_id) ?? false;
@@ -73,17 +75,26 @@ function Row({ item }: { item: FollowupItem }) {
       )}
       {done && <Transcript item={item} />}
       {done && (item.status === 'out_of_stock' || item.status === 'no_answer') && (
-        <Button
-          size="sm"
-          variant="outline"
-          className="h-11 w-full"
-          disabled={busy}
-          onClick={() => sendAction(`برای «${item.shop_name}» جایگزین پیدا کن`, 'find_alternatives', { offer_id: item.offer_id, reason: item.status })}
-        >
-          <Search className="size-4" />
-          جایگزین پیدا کن
-        </Button>
+        <div className={item.status === 'no_answer' ? 'grid grid-cols-2 gap-2' : ''}>
+          <Button
+            size="sm"
+            variant="outline"
+            className="h-11 w-full"
+            disabled={busy}
+            onClick={() => sendAction(`برای «${item.shop_name}» جایگزین پیدا کن`, 'find_alternatives', { offer_id: item.offer_id, reason: item.status })}
+          >
+            <Search className="size-4" />
+            جایگزین پیدا کن
+          </Button>
+          {item.status === 'no_answer' && (
+            <Button size="sm" variant="outline" className="h-11 w-full" onClick={() => setMyMessage(true)}>
+              <MessageSquareText className="size-4" />
+              خودم پیام بدهم
+            </Button>
+          )}
+        </div>
       )}
+      {myMessage && <SellerMessageSheet offerId={item.offer_id} onClose={() => setMyMessage(false)} />}
       {done && item.status === 'price_changed' && (
         <div className="grid grid-cols-2 gap-2">
           <Button

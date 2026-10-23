@@ -18,6 +18,7 @@ import { purchaseChecklist } from './checklist';
 import { buildPlan } from '../plan/service';
 import { visitTime, type VisitTimeOutput } from '../search/visit-time';
 import { specProductIds, specQa, type SpecAnswerOutput } from './spec-qa';
+import { sellerMessage, type SellerMessageOutput } from '../sim/seller-message';
 import { WEEK, visitSentence } from '../data/hours-stats';
 import { atLocalTime, FA_DAY } from '../data/hours';
 import { extractMission } from './mission/extract';
@@ -464,6 +465,19 @@ export const TOOL_DEFS = {
     input: z.object({ question: z.string().min(2).max(200), product_ids: z.array(z.string()).max(3).optional() }),
     run: async (i, ctx): Promise<SpecAnswerOutput> => specQa(i.question, specProductIds(i.question, ctx.state, i.product_ids)),
     toModel: (o) => ({ answer: o.answer, evidence: o.evidence.slice(0, 6).map((e) => `${e.key}: ${e.value}`), products: o.products.map((p) => p.title), note: 'Repeat the answer; add nothing that is not in the evidence.' }),
+  }),
+
+  compose_seller_message: def({
+    description:
+      'A ready-to-send message the USER can send to a shop themselves (WhatsApp / SMS / copy): greeting, product, listed price and its age in Torob, the question (availability, price — optionally a target price, hours, reserve, custom note) and the mall/floor/unit to confirm. Use when the user wants to contact the shop personally («خودم پیام بدم», «متن پیام بده»).',
+    input: z.object({
+      offer_id: z.string(),
+      intent: z.enum(['availability', 'price', 'hours', 'reserve', 'custom']).default('availability'),
+      note: z.string().max(200).optional(),
+      target_price: z.number().positive().optional(),
+    }),
+    run: async (i): Promise<SellerMessageOutput> => sellerMessage(i),
+    toModel: (o) => ({ shop: o.shop_name, intent: o.intent, text: o.text, channels: o.channels.map((c) => c.type), note: o.disclaimer }),
   }),
 
   purchase_checklist: def({
