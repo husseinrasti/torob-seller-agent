@@ -30,7 +30,7 @@ Price filtering is what Torob's own search already does. The hard part of shoppi
 
 - **Five tiers, each with its evidence and an honest confidence:** open and listed nearby · open but farther (travel time, «closes in N min», «عجله کن») · a nearby **bazaar** («بورس موبایل جمهوری» — derived from the dataset's shop density, or curated and labelled «بر اساس شناخت عمومی») that may have shops open though not in Torob · shops whose hours are unknown («بپرس بازه؟») · the earliest opening («یادآوری برای فردا ۰۹:۰۰»). A recommended tier by urgency, and the trade-off in one line («۴ کیلومتر دورتر ولی مطمئن» vs «۱ کیلومتر ولی نامطمئن»).
 - **The map is the answer:** you, the radius, prices on pins (one per building), the recommended place with a route and «≈ ۶ دقیقه با ماشین», closed shops as faint dots («بسته · فردا ۱۰:۰۰»), bazaars as shaded areas. A **time scrubber**, radius, urgency and walk/car toggles re-run the deterministic engine on the server — no LLM.
-- **Honest hours:** a declared `00:00–…` shift is a placeholder, never «open 24 h»; Friday closures are stated («جمعه ۱۰۰٪ فروشنده‌های هدفون در ۳ کیلومتر اطرافت تعطیل‌اند»). The agent adds two sentences at most.
+- **Honest hours:** a declared `00:00–…` shift is a placeholder, never «open 24 h»; Friday closures are stated («جمعه ۱۰۰٪ فروشنده‌های هدفون در ۳ کیلومتر اطرافت تعطیل‌اند»). The card is the answer — no extra prose after it.
 
 Try: «ساعت ۱۱:۳۰ شب، شارژر گوشی می‌خوام نزدیک میدان هفت تیر» · «جمعه ظهر هدفون می‌خوام» · «کابل تایپ‌سی، ۱۵ دقیقه دیگه قطار دارم» ([DECISIONS #101–105](docs/DECISIONS.md), [demo beats 2–3](docs/DEMO.md)).
 
@@ -64,7 +64,7 @@ Try: «ساعت ۱۱:۳۰ شب، شارژر گوشی می‌خوام نزدیک 
 | **Best time to visit** (F11) | «کی برم؟» → share of open shops per hour (heatmap per weekday), the best window («یکشنبه بین ۱۱ تا ۱۸، ۹۳٪ بازند»), Friday closures, shops without hours; the visit plan offers «شروع از ۱۱:۰۰» when it would start outside the window. |
 
 ### Minimal by design (TorobChat benchmark)
-Location · radius · «فیلترها» instead of six chips; a hero with one input and three examples; one primary action per card with «…» for the rest; fewer borders. Same behaviour, less chrome ([DECISIONS #106](docs/DECISIONS.md)):
+Location · radius · «فیلترها» instead of six chips; a hero with one input and three examples; one primary action per card with «…» for the rest; seller cards keep only what decides (price · price age · stock, open state, mall/floor/unit) with the rest in «جزئیات»; no LLM prose after a card, and free replies stop after two sentences. Same behaviour, less text ([DECISIONS #106, #108](docs/DECISIONS.md)):
 
 | Before (v1.1) | After |
 |---|---|
@@ -187,7 +187,7 @@ pnpm llm-check                             # one tool call per configured provid
 
 ## Honesty note — simulated seller contact
 
-The dataset's shop names and phone numbers are fake, so the agent **cannot** really call or message shops. Follow‑ups are **simulated** and labelled so in the UI («شبیه‌سازی‌شده — در نسخه واقعی از طریق پیام‌رسان/تماس ترب انجام می‌شود»). The outcome is deterministic per offer — `sha256(SIM_SALT + offer_id)` — and depends on the price freshness (stale prices are more often out of stock or changed), on the channel (a call to a closed shop is not answered) and arrives after 1.5–4 s. Seller lines are written by the fast LLM constrained to that outcome (rejected if they mention any other price) or by templates. The architecture is ready for a real channel: replace `lib/sim/` with a messaging/call integration that writes the same `followups` rows.
+The dataset's shop names and phone numbers are fake, so the agent **cannot** really call or message shops. Follow‑ups are **simulated** and labelled so in the UI («پیگیری‌ها شبیه‌سازی‌شده‌اند»; a real version would go through Torob's messaging/call channel). The outcome is deterministic per offer — `sha256(SIM_SALT + offer_id)` — and depends on the price freshness (stale prices are more often out of stock or changed), on the channel (a call to a closed shop is not answered) and arrives after 1.5–4 s. Seller lines are written by the fast LLM constrained to that outcome (rejected if they mention any other price) or by templates. The architecture is ready for a real channel: replace `lib/sim/` with a messaging/call integration that writes the same `followups` rows.
 
 ## Dataset
 
